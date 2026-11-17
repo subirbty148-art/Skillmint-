@@ -4,6 +4,8 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
   query,
   runTransaction,
   serverTimestamp,
@@ -12,158 +14,92 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { DEFAULT_COURSES, DEFAULT_PLANS, DEFAULT_SETTINGS } from '../data/defaults';
-import { auth, db, handleFirestoreError, OperationType, storage } from './firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { DEFAULT_COURSES, DEFAULT_PLANS, DEFAULT_SETTINGS } from '../lib/seedDefaults';
 import {
+  AdminRecord,
   Course,
   MembershipPlan,
-  NotificationItem,
   PaymentMethod,
+  PaymentSubmission,
+  PlatformNotification,
   PlatformSettings,
+  ReferralRecord,
   UserProfile,
-} from '../types/models';
+  WalletTransaction,
+  WithdrawalRequest,
+} from '../types/domain';
 
-const REFERRAL_STORAGE_KEY = 'skillmint_ref_code';
+function sanitizeId(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9_\-]/g, '').slice(0, 128);
+}
 
-export function saveCapturedReferralCode(rawCode: string): string {
-  const clean = rawCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (clean.length >= 4 && clean.length <= 20) {
-    try {
-      window.localStorage.setItem(REFERRAL_STORAGE_KEY, clean);
-    } catch {
-      // Ignore storage access restrictions
-    }
-    return clean;
+function generateUniqueUserId(): string {
+  const num = Math.floor(100000 + Math.random() * 900000);
+  return `SMU-${num}`;
+}
+
+function generateReferralCode(fullName: string): string {
+  const prefix = fullName
+    .replace(/[^a-zA-Z]/g, '')
+    .toUpperCase()
+    .slice(0, 2)
+    .padEnd(2, 'S');
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let suffix = '';
+  for (let i = 0; i < 6; i++) {
+    suffix += chars[Math.floor(Math.random() * chars.length)];
   }
-  return '';
+  return `SM${prefix}${suffix}`;
 }
 
-export function getCapturedReferralCode(): string {
-  try {
-    return window.localStorage.getItem(REFERRAL_STORAGE_KEY) || '';
-  } catch {
-    return '';
-  }
-}
-
-export function captureReferralCodeFromSearch(search: string): string {
-  try {
-    const params = new URLSearchParams(search);
-    const ref = params.get('ref');
-    if (ref) {
-      return saveCapturedReferralCode(ref);
-    }
-  } catch {
-    // Ignore malformed search string
-  }
-  return '';
-}
-
-export function sanitizeId(input: string): string {
-  return input.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-}
-
-export function generateRecordId(prefix: string): string {
-  const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
-  return `${prefix}_${Date.now()}_${rand}`;
-}
-
-export async function compressImageToDataUrlAndBlob(
-  file: File,
-  maxWidth = 900,
-  quality = 0.76
-): Promise<{ blob: Blob; dataUrl: string }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Failed to read image file.'));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error('Invalid image file selected.'));
-      img.onload = () => {
-        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
-        const width = Math.round(img.width * scale);
-        const height = Math.round(img.height * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Canvas context unavailable.'));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('Failed to compress image.'));
-              return;
-            }
-            resolve({ blob, dataUrl });
-          },
-          'image/jpeg',
-          quality
-        );
-      };
-      img.src = String(reader.result);
-    };
-    reader.readAsDataURL(file);
+async function verifyAdminActionWithServer(
+  action: string,
+  targetId: string,
+  amount?: number
+): Promise<void> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error('Not authenticated.');
+  const token = await currentUser.getIdToken();
+  const res = await fetch('/api/admin/verify-action', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action, targetId, amount }),
   });
-}
-
-export async function uploadImageAsset(file: File, storagePath: string): Promise<string> {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('Please upload a valid image file (PNG, JPG, WEBP).');
-  }
-  const { blob, dataUrl } = await compressImageToDataUrlAndBlob(file, 880, 0.74);
-
-  try {
-    const storageRef = ref(storage, storagePath);
-    await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
-    const url = await getDownloadURL(storageRef);
-    return url;
-  } catch (err) {
-    console.warn('Firebase Storage upload unavailable, using compressed inline asset fallback:', err);
-    if (dataUrl.length > 230000) {
-      const smaller = await compressImageToDataUrlAndBlob(file, 560, 0.6);
-      if (smaller.dataUrl.length > 230000) {
-        throw new Error('Image is too large. Please select a smaller screenshot under 2 MB.');
-      }
-      return smaller.dataUrl;
-    }
-    return dataUrl;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Server verification of admin session failed.');
   }
 }
 
-export async function lookupReferralCode(code: string): Promise<{
-  code: string;
-  ownerUid: string;
-  ownerName: string;
-  active: boolean;
-} | null> {
-  const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (cleanCode.length < 4 || cleanCode.length > 20) return null;
-  const path = `referralCodes/${cleanCode}`;
+export async function lookupReferralCode(
+  code: string
+): Promise<{ code: string; ownerId: string; ownerName: string; active: boolean } | null> {
+  const clean = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (clean.length < 4 || clean.length > 20) return null;
   try {
-    const snap = await getDoc(doc(db, 'referralCodes', cleanCode));
+    const snap = await getDoc(doc(db, 'referralCodes', clean));
     if (!snap.exists()) return null;
     const data = snap.data();
     return {
       code: data.code,
-      ownerUid: data.ownerUid,
+      ownerId: data.ownerId,
       ownerName: data.ownerName,
-      active: Boolean(data.active),
+      active: data.active === true,
     };
   } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
+    handleFirestoreError(error, OperationType.GET, `referralCodes/${clean}`);
   }
 }
 
-export async function createOrLoadUserProfile(params: {
+export async function createOrEnsureUserProfile(params: {
   uid: string;
   email: string;
-  displayName: string;
+  fullName: string;
+  phone?: string;
   referralCodeInput?: string;
 }): Promise<UserProfile> {
   const userRef = doc(db, 'users', params.uid);
@@ -172,80 +108,79 @@ export async function createOrLoadUserProfile(params: {
     if (existingSnap.exists()) {
       return existingSnap.data() as UserProfile;
     }
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `users/${params.uid}`);
-  }
 
-  const safeName = (params.displayName || params.email.split('@')[0] || 'Member').trim().slice(0, 80);
-  const cleanUidUpper = params.uid.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  const suffix = (cleanUidUpper + 'ABCDEF').slice(0, 6);
-  const uniqueUserId = `SM-${suffix}`;
-  const myReferralCode = `SM${suffix}`;
+    const cleanName = params.fullName.trim().slice(0, 100) || 'SkillMint Member';
+    const cleanEmail = params.email.trim().slice(0, 160);
+    const cleanPhone = (params.phone || '').trim().slice(0, 24);
 
-  let referredByCode = '';
-  let referredByUid = '';
-  const candidateReferralCode = (params.referralCodeInput || getCapturedReferralCode() || '').trim();
-
-  if (candidateReferralCode) {
-    const refLookup = await lookupReferralCode(candidateReferralCode);
-    if (refLookup && refLookup.active && refLookup.ownerUid !== params.uid) {
-      referredByCode = refLookup.code;
-      referredByUid = refLookup.ownerUid;
+    // Ensure a unique referral code
+    let newRefCode = generateReferralCode(cleanName);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const check = await getDoc(doc(db, 'referralCodes', newRefCode));
+      if (!check.exists()) break;
+      newRefCode = generateReferralCode(cleanName);
     }
-  }
 
-  const batch = writeBatch(db);
-  const now = serverTimestamp();
+    // Validate entered referral code (prevent self-referral)
+    let referredByCode: string | null = null;
+    let referredByUid: string | null = null;
+    if (params.referralCodeInput && params.referralCodeInput.trim().length >= 4) {
+      const refLookup = await lookupReferralCode(params.referralCodeInput);
+      if (refLookup && refLookup.active && refLookup.ownerId !== params.uid) {
+        referredByCode = refLookup.code;
+        referredByUid = refLookup.ownerId;
+      }
+    }
 
-  const newUserDoc: Record<string, any> = {
-    uid: params.uid,
-    uniqueUserId,
-    displayName: safeName.length >= 2 ? safeName : 'SkillMint Member',
-    email: params.email.slice(0, 200),
-    phone: '',
-    upiId: '',
-    referralCode: myReferralCode,
-    referredByCode,
-    referredByUid,
-    walletBalance: 0,
-    bonusBalance: 0,
-    totalEarnings: 0,
-    totalReferrals: 0,
-    activePlanId: '',
-    activePlanName: '',
-    courseAccess: [],
-    isBlocked: false,
-    role: 'user',
-    createdAt: now,
-    updatedAt: now,
-  };
+    const uniqueId = generateUniqueUserId();
+    const batch = writeBatch(db);
 
-  batch.set(userRef, newUserDoc);
-  batch.set(doc(db, 'referralCodes', myReferralCode), {
-    code: myReferralCode,
-    ownerUid: params.uid,
-    ownerName: newUserDoc.displayName,
-    active: true,
-    createdAt: now,
-  });
+    const newUserDoc: Record<string, any> = {
+      uid: params.uid,
+      uniqueId,
+      fullName: cleanName,
+      email: cleanEmail,
+      referralCode: newRefCode,
+      referredByCode,
+      referredByUid,
+      role: 'user',
+      isBlocked: false,
+      walletBalance: 0,
+      bonusBalance: 0,
+      totalEarnings: 0,
+      totalReferrals: 0,
+      activePlanId: null,
+      activePlanName: null,
+      courseAccess: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    if (cleanPhone) newUserDoc.phone = cleanPhone;
 
-  if (referredByUid && referredByCode) {
-    batch.set(doc(db, 'referrals', params.uid), {
-      id: params.uid,
-      referrerUid: referredByUid,
-      referrerCode: referredByCode,
-      referredUid: params.uid,
-      referredName: newUserDoc.displayName,
-      referredEmail: newUserDoc.email,
-      status: 'registered',
-      rewardAmount: 0,
-      qualifyingPlanId: '',
-      createdAt: now,
-      updatedAt: now,
+    batch.set(userRef, newUserDoc);
+    batch.set(doc(db, 'referralCodes', newRefCode), {
+      code: newRefCode,
+      ownerId: params.uid,
+      ownerName: cleanName,
+      active: true,
+      createdAt: serverTimestamp(),
     });
-  }
 
-  try {
+    if (referredByCode && referredByUid) {
+      batch.set(doc(db, 'referrals', params.uid), {
+        id: params.uid,
+        referrerId: referredByUid,
+        referrerCode: referredByCode,
+        referredUserId: params.uid,
+        referredUserName: cleanName,
+        qualifyingPlanId: null,
+        rewardAmount: 0,
+        status: 'pending_verification',
+        createdAt: serverTimestamp(),
+        rewardedAt: null,
+      });
+    }
+
     await batch.commit();
     const createdSnap = await getDoc(userRef);
     return createdSnap.data() as UserProfile;
@@ -256,17 +191,13 @@ export async function createOrLoadUserProfile(params: {
 
 export async function updateOwnProfile(
   uid: string,
-  updates: { displayName: string; phone: string; upiId: string }
+  updates: { fullName: string; phone: string; upiId: string }
 ): Promise<void> {
-  const cleanName = updates.displayName.trim().slice(0, 80);
-  if (cleanName.length < 2) {
-    throw new Error('Display name must be at least 2 characters.');
-  }
   const path = `users/${uid}`;
   try {
     await updateDoc(doc(db, 'users', uid), {
-      displayName: cleanName,
-      phone: updates.phone.trim().slice(0, 20),
+      fullName: updates.fullName.trim().slice(0, 100),
+      phone: updates.phone.trim().slice(0, 24),
       upiId: updates.upiId.trim().slice(0, 100),
       updatedAt: serverTimestamp(),
     });
@@ -275,43 +206,40 @@ export async function updateOwnProfile(
   }
 }
 
-export async function seedInitialCatalogIfAdmin(): Promise<void> {
+export async function seedInitialCatalogIfEmpty(): Promise<void> {
   try {
-    const [plansSnap, coursesSnap, settingsSnap] = await Promise.all([
-      getDocs(collection(db, 'plans')),
-      getDocs(collection(db, 'courses')),
-      getDoc(doc(db, 'settings', 'platform')),
-    ]);
+    const plansSnap = await getDocs(collection(db, 'plans'));
+    const coursesSnap = await getDocs(collection(db, 'courses'));
+    const settingsSnap = await getDoc(doc(db, 'settings', 'platform'));
 
     const batch = writeBatch(db);
     let hasWrites = false;
-    const now = serverTimestamp();
 
     if (plansSnap.empty) {
       for (const plan of DEFAULT_PLANS) {
         batch.set(doc(db, 'plans', plan.id), {
           ...plan,
-          updatedAt: now,
+          updatedAt: serverTimestamp(),
         });
+        hasWrites = true;
       }
-      hasWrites = true;
     }
 
     if (coursesSnap.empty) {
       for (const course of DEFAULT_COURSES) {
         batch.set(doc(db, 'courses', course.id), {
           ...course,
-          createdAt: now,
-          updatedAt: now,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         });
+        hasWrites = true;
       }
-      hasWrites = true;
     }
 
     if (!settingsSnap.exists()) {
       batch.set(doc(db, 'settings', 'platform'), {
         ...DEFAULT_SETTINGS,
-        updatedAt: now,
+        updatedAt: serverTimestamp(),
       });
       hasWrites = true;
     }
@@ -320,76 +248,77 @@ export async function seedInitialCatalogIfAdmin(): Promise<void> {
       await batch.commit();
     }
   } catch (error) {
-    console.warn('Catalog seed skipped or insufficient permissions:', error);
+    handleFirestoreError(error, OperationType.WRITE, 'catalog/seed');
   }
 }
 
-export async function submitPaymentProof(params: {
+export async function submitManualPayment(params: {
   user: UserProfile;
   plan: MembershipPlan;
-  method: PaymentMethod;
+  paymentMethod: PaymentMethod;
   transactionId: string;
-  screenshotFile: File;
+  screenshotUrl: string;
 }): Promise<string> {
-  const cleanTxId = params.transactionId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-  if (cleanTxId.length < 6 || cleanTxId.length > 64) {
+  const normalizedUtr = params.transactionId
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9\-_]/g, '');
+
+  if (normalizedUtr.length < 6 || normalizedUtr.length > 64) {
     throw new Error('Transaction ID / UTR must be 6 to 64 alphanumeric characters.');
   }
+  if (!params.screenshotUrl || params.screenshotUrl.length < 5) {
+    throw new Error('Please upload a payment screenshot proof.');
+  }
 
-  // Ensure plan exists in live Firestore (required by security rule)
+  // Ensure plan exists in Firestore first
   const planSnap = await getDoc(doc(db, 'plans', params.plan.id));
   if (!planSnap.exists()) {
     throw new Error(
-      'Plans are not yet published in Firestore. Please ask the administrator to sign in to /admin once to initialize the catalog.'
+      'Plans catalog is awaiting initial sync by an administrator. Please ask admin to open /admin once to publish plans.'
     );
   }
 
-  // Duplicate UTR / Transaction ID check
-  const txLockRef = doc(db, 'transactionIds', cleanTxId);
-  const txLockSnap = await getDoc(txLockRef);
-  if (txLockSnap.exists()) {
-    throw new Error('This UPI Transaction ID has already been submitted. Duplicate UTRs are not permitted.');
+  const utrRef = doc(db, 'transactionRefs', normalizedUtr);
+  const existingUtr = await getDoc(utrRef);
+  if (existingUtr.exists()) {
+    throw new Error('This Transaction ID / UTR has already been submitted.');
   }
 
-  const paymentId = generateRecordId('PAY');
-  const screenshotUrl = await uploadImageAsset(
-    params.screenshotFile,
-    `payment-screenshots/${params.user.uid}/${paymentId}.jpg`
-  );
-
+  const paymentId = sanitizeId(`pay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
   const batch = writeBatch(db);
-  const now = serverTimestamp();
-
-  batch.set(txLockRef, {
-    txId: cleanTxId,
-    paymentId,
-    userId: params.user.uid,
-    createdAt: now,
-  });
 
   batch.set(doc(db, 'payments', paymentId), {
     id: paymentId,
     userId: params.user.uid,
-    userName: params.user.displayName.slice(0, 80),
-    userEmail: params.user.email.slice(0, 200),
+    userEmail: params.user.email,
+    userName: params.user.fullName,
     planId: params.plan.id,
-    planName: params.plan.name.slice(0, 80),
+    planName: params.plan.name,
     amount: params.plan.price,
-    bonusAmount: params.plan.bonus,
-    method: params.method,
-    transactionId: cleanTxId,
-    screenshotUrl,
+    paymentMethod: params.paymentMethod,
+    transactionId: normalizedUtr,
+    screenshotUrl: params.screenshotUrl,
     status: 'pending',
-    adminNote: '',
-    createdAt: now,
-    updatedAt: now,
+    adminNote: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  batch.set(utrRef, {
+    utr: normalizedUtr,
+    paymentId,
+    userId: params.user.uid,
+    createdAt: serverTimestamp(),
   });
 
   try {
     await batch.commit();
     return paymentId;
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `payments/${paymentId}`);
+    handleFirestoreError(error, OperationType.CREATE, `payments/${paymentId}`);
   }
 }
 
@@ -397,41 +326,58 @@ export async function submitWithdrawalRequest(params: {
   user: UserProfile;
   amount: number;
   upiId: string;
-  minWithdrawal: number;
-  pendingHoldAmount: number;
+  minWithdrawalAmount: number;
 }): Promise<string> {
-  const cleanAmount = Math.floor(Number(params.amount));
-  const cleanUpi = params.upiId.trim();
+  const amount = Math.floor(Number(params.amount));
+  const cleanUpi = params.upiId.trim().slice(0, 100);
 
-  if (isNaN(cleanAmount) || cleanAmount < params.minWithdrawal) {
-    throw new Error(`Minimum withdrawal amount is ₹${params.minWithdrawal}.`);
+  if (params.user.isBlocked) {
+    throw new Error('Your account is currently restricted. Contact support.');
   }
-  const availableAfterHold = params.user.walletBalance - params.pendingHoldAmount;
-  if (cleanAmount > availableAfterHold) {
+  if (Number.isNaN(amount) || amount < params.minWithdrawalAmount) {
+    throw new Error(`Minimum withdrawal amount is ₹${params.minWithdrawalAmount}.`);
+  }
+  if (amount > params.user.walletBalance) {
+    throw new Error('Insufficient available wallet balance.');
+  }
+  if (!cleanUpi.includes('@') || cleanUpi.length < 5) {
+    throw new Error('Please enter a valid UPI ID (e.g. name@okaxis).');
+  }
+
+  // Check if user already has a pending withdrawal exceeding remaining balance
+  const pendingSnap = await getDocs(
+    query(
+      collection(db, 'withdrawals'),
+      where('userId', '==', params.user.uid),
+      where('status', '==', 'pending')
+    )
+  );
+  let pendingTotal = 0;
+  pendingSnap.forEach((d) => {
+    pendingTotal += Number(d.data().amount || 0);
+  });
+  if (pendingTotal + amount > params.user.walletBalance) {
     throw new Error(
-      `Insufficient available wallet balance. Available after pending requests: ₹${Math.max(0, availableAfterHold)}.`
+      `You already have ₹${pendingTotal} in pending withdrawals. Remaining withdrawable balance is ₹${Math.max(0, params.user.walletBalance - pendingTotal)}.`
     );
   }
-  if (!cleanUpi.includes('@') || cleanUpi.length < 5 || cleanUpi.length > 100) {
-    throw new Error('Please enter a valid UPI ID (example: username@okicici).');
-  }
 
-  const withdrawalId = generateRecordId('WDR');
-  const now = serverTimestamp();
-
+  const withdrawalId = sanitizeId(`wd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
   try {
     await setDoc(doc(db, 'withdrawals', withdrawalId), {
       id: withdrawalId,
       userId: params.user.uid,
-      userName: params.user.displayName.slice(0, 80),
-      userEmail: params.user.email.slice(0, 200),
-      amount: cleanAmount,
+      userEmail: params.user.email,
+      userName: params.user.fullName,
+      amount,
       upiId: cleanUpi,
       status: 'pending',
-      adminNote: '',
-      payoutRef: '',
-      createdAt: now,
-      updatedAt: now,
+      adminNote: null,
+      payoutReference: null,
+      reviewedBy: null,
+      reviewedAt: null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     });
     return withdrawalId;
   } catch (error) {
@@ -439,688 +385,548 @@ export async function submitWithdrawalRequest(params: {
   }
 }
 
-// --- Admin Atomic Actions ---
+// ==========================================
+// ADMIN OPERATIONS (Atomic & Server-Audited)
+// ==========================================
 
-export async function adminReviewPayment(params: {
-  paymentId: string;
-  decision: 'approved' | 'rejected';
-  adminUid: string;
-  adminNote: string;
-}): Promise<void> {
-  const paymentRef = doc(db, 'payments', params.paymentId);
+export async function adminApprovePayment(
+  paymentId: string,
+  adminUid: string,
+  adminNote = 'Verified via UTR statement'
+): Promise<void> {
+  await verifyAdminActionWithServer('approve_payment', paymentId);
+
   try {
     await runTransaction(db, async (tx) => {
+      const paymentRef = doc(db, 'payments', paymentId);
       const paymentSnap = await tx.get(paymentRef);
-      if (!paymentSnap.exists()) {
-        throw new Error('Payment document not found.');
-      }
-      const payment = paymentSnap.data();
+      if (!paymentSnap.exists()) throw new Error('Payment record not found.');
+
+      const payment = paymentSnap.data() as PaymentSubmission;
       if (payment.status !== 'pending') {
-        throw new Error(`Payment is already ${payment.status}.`);
-      }
-
-      const now = serverTimestamp();
-
-      if (params.decision === 'rejected') {
-        tx.update(paymentRef, {
-          status: 'rejected',
-          adminNote: (params.adminNote || 'Payment proof could not be verified.').slice(0, 300),
-          reviewedBy: params.adminUid,
-          reviewedAt: now,
-          updatedAt: now,
-        });
-
-        const notifId = generateRecordId('NTF');
-        tx.set(doc(db, 'notifications', notifId), {
-          id: notifId,
-          userId: payment.userId,
-          title: 'Payment Verification Update',
-          message: `Your payment of ₹${payment.amount} (UTR: ${payment.transactionId}) was rejected. ${params.adminNote || ''}`.trim().slice(0, 600),
-          type: 'warning',
-          createdAt: now,
-        });
-        return;
+        throw new Error(`Payment already ${payment.status}.`);
       }
 
       const userRef = doc(db, 'users', payment.userId);
+      const userSnap = await tx.get(userRef);
+      if (!userSnap.exists()) throw new Error('Member profile not found.');
+      const member = userSnap.data() as UserProfile;
+
       const planRef = doc(db, 'plans', payment.planId);
-      const referralRef = doc(db, 'referrals', payment.userId);
-
-      const [userSnap, planSnap, referralSnap] = await Promise.all([
-        tx.get(userRef),
-        tx.get(planRef),
-        tx.get(referralRef),
-      ]);
-
-      if (!userSnap.exists()) throw new Error('Target user profile not found.');
-      if (!planSnap.exists()) throw new Error('Target membership plan not found.');
-
-      const user = userSnap.data() as UserProfile;
+      const planSnap = await tx.get(planRef);
+      if (!planSnap.exists()) throw new Error('Membership plan not found.');
       const plan = planSnap.data() as MembershipPlan;
 
+      const settingsRef = doc(db, 'settings', 'platform');
+      const settingsSnap = await tx.get(settingsRef);
+      const settings = settingsSnap.exists()
+        ? (settingsSnap.data() as PlatformSettings)
+        : (DEFAULT_SETTINGS as PlatformSettings);
+
+      const referralRef = doc(db, 'referrals', payment.userId);
+      const referralSnap = await tx.get(referralRef);
+
       let referrerSnap: any = null;
-      if (
-        referralSnap.exists() &&
-        referralSnap.data().status === 'registered' &&
-        referralSnap.data().referrerUid &&
-        referralSnap.data().referrerUid !== user.uid
-      ) {
-        referrerSnap = await tx.get(doc(db, 'users', referralSnap.data().referrerUid));
+      let referrerRef: any = null;
+      if (referralSnap.exists()) {
+        const refData = referralSnap.data() as ReferralRecord;
+        if (
+          refData.status === 'pending_verification' &&
+          refData.referrerId !== payment.userId &&
+          settings.referralEnabled
+        ) {
+          referrerRef = doc(db, 'users', refData.referrerId);
+          referrerSnap = await tx.get(referrerRef);
+        }
       }
 
-      const mergedCourses = Array.from(new Set([...(user.courseAccess || []), ...(plan.courseIds || [])])).slice(0, 50);
-      const planBonus = Number(plan.bonus || 0);
+      // Merge newly unlocked courses
+      const mergedCourses = Array.from(
+        new Set([...(member.courseAccess || []), ...(plan.includedCourseIds || [])])
+      ).slice(0, 50);
 
+      const signupBonus = Number(plan.signupBonus || 0);
+      const newBonusBalance = Number(member.bonusBalance || 0) + signupBonus;
+      const newTotalEarnings = Number(member.totalEarnings || 0) + signupBonus;
+
+      // 1. Mark Payment Approved
       tx.update(paymentRef, {
         status: 'approved',
-        adminNote: (params.adminNote || 'Verified and activated.').slice(0, 300),
-        reviewedBy: params.adminUid,
-        reviewedAt: now,
-        updatedAt: now,
+        adminNote: adminNote.trim().slice(0, 500),
+        reviewedBy: adminUid,
+        reviewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
+      // 2. Activate Plan, Courses & Welcome Bonus on Member
       tx.update(userRef, {
         activePlanId: plan.id,
         activePlanName: plan.name,
         courseAccess: mergedCourses,
-        bonusBalance: Number(user.bonusBalance || 0) + planBonus,
-        totalEarnings: Number(user.totalEarnings || 0) + planBonus,
-        updatedAt: now,
+        bonusBalance: newBonusBalance,
+        totalEarnings: newTotalEarnings,
+        updatedAt: serverTimestamp(),
       });
 
-      const activationTxId = generateRecordId('TX');
-      tx.set(doc(db, 'transactions', activationTxId), {
-        id: activationTxId,
-        userId: user.uid,
-        type: 'plan_activation',
-        amount: Number(payment.amount),
-        balanceType: 'wallet',
-        direction: 'credit',
-        title: `${plan.name} Activated (UTR ${payment.transactionId})`.slice(0, 160),
-        referenceId: payment.id,
-        status: 'completed',
-        createdAt: now,
-      });
-
-      if (planBonus > 0) {
-        const bonusTxId = generateRecordId('TX');
+      // 3. Record Welcome Bonus Ledger Entry
+      if (signupBonus > 0) {
+        const bonusTxId = sanitizeId(`tx_pb_${paymentId}`);
         tx.set(doc(db, 'transactions', bonusTxId), {
           id: bonusTxId,
-          userId: user.uid,
+          userId: member.uid,
           type: 'plan_bonus',
-          amount: planBonus,
-          balanceType: 'bonus',
+          walletTarget: 'bonusBalance',
           direction: 'credit',
-          title: `${plan.name} Membership Bonus`.slice(0, 160),
-          referenceId: payment.id,
-          status: 'completed',
-          createdAt: now,
+          amount: signupBonus,
+          description: `${plan.name} activation bonus (UTR ${payment.transactionId})`,
+          referenceId: paymentId,
+          createdBy: adminUid,
+          createdAt: serverTimestamp(),
         });
       }
 
-      const userNotifId = generateRecordId('NTF');
-      tx.set(doc(db, 'notifications', userNotifId), {
-        id: userNotifId,
-        userId: user.uid,
+      // 4. Notify Member
+      const memberNotifId = sanitizeId(`notif_pay_${paymentId}`);
+      tx.set(doc(db, 'notifications', memberNotifId), {
+        id: memberNotifId,
+        targetUserId: member.uid,
         title: `${plan.name} Activated`,
-        message: `Your payment of ₹${payment.amount} is verified. ₹${planBonus} bonus and ${plan.courseIds.length} course(s) are now unlocked.`.slice(0, 600),
-        type: 'success',
-        createdAt: now,
+        message: `Your payment (UTR ${payment.transactionId}) was verified. Courses unlocked and ₹${signupBonus} bonus added.`,
+        type: 'payment',
+        createdAt: serverTimestamp(),
       });
 
-      // Process verified referral reward atomically if applicable
-      if (referrerSnap && referrerSnap.exists()) {
+      // 5. Credit Referrer if qualifying referral exists
+      if (referrerSnap && referrerSnap.exists() && referrerRef) {
         const referrer = referrerSnap.data() as UserProfile;
-        const reward = Number(plan.referralReward || 0);
-        if (!referrer.isBlocked && reward > 0) {
-          tx.update(referralRef, {
-            status: 'rewarded',
-            rewardAmount: reward,
-            qualifyingPlanId: plan.id,
-            updatedAt: now,
-          });
-
-          tx.update(doc(db, 'users', referrer.uid), {
+        const reward = Number(plan.referralBonus || 0);
+        if (reward > 0 && !referrer.isBlocked) {
+          tx.update(referrerRef, {
             walletBalance: Number(referrer.walletBalance || 0) + reward,
             totalEarnings: Number(referrer.totalEarnings || 0) + reward,
             totalReferrals: Number(referrer.totalReferrals || 0) + 1,
-            updatedAt: now,
+            updatedAt: serverTimestamp(),
           });
 
-          const refTxId = generateRecordId('TX');
+          tx.update(referralRef, {
+            qualifyingPlanId: plan.id,
+            rewardAmount: reward,
+            status: 'qualified_rewarded',
+            rewardedAt: serverTimestamp(),
+          });
+
+          const refTxId = sanitizeId(`tx_ref_${paymentId}`);
           tx.set(doc(db, 'transactions', refTxId), {
             id: refTxId,
             userId: referrer.uid,
             type: 'referral_reward',
-            amount: reward,
-            balanceType: 'wallet',
+            walletTarget: 'walletBalance',
             direction: 'credit',
-            title: `Verified Referral Reward · ${user.displayName}`.slice(0, 160),
-            referenceId: referralRef.id,
-            status: 'completed',
-            createdAt: now,
+            amount: reward,
+            description: `Verified referral reward from ${member.fullName} (${plan.name})`,
+            referenceId: paymentId,
+            createdBy: adminUid,
+            createdAt: serverTimestamp(),
           });
 
-          const refNotifId = generateRecordId('NTF');
+          const refNotifId = sanitizeId(`notif_ref_${paymentId}`);
           tx.set(doc(db, 'notifications', refNotifId), {
             id: refNotifId,
-            userId: referrer.uid,
-            title: 'Referral Reward Credited',
-            message: `₹${reward} has been added to your Wallet Balance after ${user.displayName}'s ${plan.name} payment was verified.`.slice(0, 600),
-            type: 'success',
-            createdAt: now,
+            targetUserId: referrer.uid,
+            title: `Referral Reward Credited: ₹${reward}`,
+            message: `${member.fullName}'s ${plan.name} payment was verified. ₹${reward} added to your withdrawable wallet.`,
+            type: 'referral',
+            createdAt: serverTimestamp(),
           });
         }
       }
     });
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `payments/${params.paymentId}`);
+    handleFirestoreError(error, OperationType.UPDATE, `payments/${paymentId}`);
   }
 }
 
-export async function adminReviewWithdrawal(params: {
-  withdrawalId: string;
-  decision: 'approved' | 'rejected';
-  adminUid: string;
-  payoutRef?: string;
-  adminNote?: string;
-}): Promise<void> {
-  const withdrawalRef = doc(db, 'withdrawals', params.withdrawalId);
+export async function adminRejectPayment(
+  paymentId: string,
+  adminUid: string,
+  reason: string
+): Promise<void> {
+  await verifyAdminActionWithServer('reject_payment', paymentId);
   try {
     await runTransaction(db, async (tx) => {
-      const wSnap = await tx.get(withdrawalRef);
-      if (!wSnap.exists()) throw new Error('Withdrawal request not found.');
-      const withdrawal = wSnap.data();
-      if (withdrawal.status !== 'pending') {
-        throw new Error(`Withdrawal is already ${withdrawal.status}.`);
+      const paymentRef = doc(db, 'payments', paymentId);
+      const paymentSnap = await tx.get(paymentRef);
+      if (!paymentSnap.exists()) throw new Error('Payment not found.');
+      const payment = paymentSnap.data() as PaymentSubmission;
+      if (payment.status !== 'pending') {
+        throw new Error(`Payment already ${payment.status}.`);
       }
 
-      const now = serverTimestamp();
-
-      if (params.decision === 'rejected') {
-        tx.update(withdrawalRef, {
-          status: 'rejected',
-          adminNote: (params.adminNote || 'Withdrawal request declined by admin.').slice(0, 300),
-          payoutRef: '',
-          reviewedBy: params.adminUid,
-          reviewedAt: now,
-          updatedAt: now,
-        });
-
-        const notifId = generateRecordId('NTF');
-        tx.set(doc(db, 'notifications', notifId), {
-          id: notifId,
-          userId: withdrawal.userId,
-          title: 'Withdrawal Request Declined',
-          message: `Your withdrawal request of ₹${withdrawal.amount} was declined. ${params.adminNote || ''}`.trim().slice(0, 600),
-          type: 'warning',
-          createdAt: now,
-        });
-        return;
-      }
-
-      const userRef = doc(db, 'users', withdrawal.userId);
-      const userSnap = await tx.get(userRef);
-      if (!userSnap.exists()) throw new Error('User record not found.');
-      const user = userSnap.data() as UserProfile;
-
-      if (Number(user.walletBalance || 0) < Number(withdrawal.amount)) {
-        throw new Error('User wallet balance is lower than the requested withdrawal amount.');
-      }
-
-      tx.update(withdrawalRef, {
-        status: 'approved',
-        payoutRef: (params.payoutRef || 'UPI-PAID').slice(0, 80),
-        adminNote: (params.adminNote || 'Payout sent to UPI ID.').slice(0, 300),
-        reviewedBy: params.adminUid,
-        reviewedAt: now,
-        updatedAt: now,
+      tx.update(paymentRef, {
+        status: 'rejected',
+        adminNote: (reason || 'UTR could not be matched').trim().slice(0, 500),
+        reviewedBy: adminUid,
+        reviewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
-      tx.update(userRef, {
-        walletBalance: Number(user.walletBalance) - Number(withdrawal.amount),
-        updatedAt: now,
-      });
-
-      const txId = generateRecordId('TX');
-      tx.set(doc(db, 'transactions', txId), {
-        id: txId,
-        userId: user.uid,
-        type: 'withdrawal',
-        amount: Number(withdrawal.amount),
-        balanceType: 'wallet',
-        direction: 'debit',
-        title: `UPI Withdrawal (${withdrawal.upiId})`.slice(0, 160),
-        referenceId: withdrawal.id,
-        status: 'completed',
-        createdAt: now,
-      });
-
-      const notifId = generateRecordId('NTF');
+      const notifId = sanitizeId(`notif_rej_${paymentId}`);
       tx.set(doc(db, 'notifications', notifId), {
         id: notifId,
-        userId: user.uid,
-        title: 'Withdrawal Paid',
-        message: `₹${withdrawal.amount} has been transferred to ${withdrawal.upiId} (Ref: ${params.payoutRef || 'UPI-PAID'}).`.slice(0, 600),
-        type: 'success',
-        createdAt: now,
+        targetUserId: payment.userId,
+        title: 'Payment Verification Declined',
+        message: `Payment UTR ${payment.transactionId} was rejected: ${reason || 'Could not verify transaction.'}`,
+        type: 'payment',
+        createdAt: serverTimestamp(),
       });
     });
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `withdrawals/${params.withdrawalId}`);
+    handleFirestoreError(error, OperationType.UPDATE, `payments/${paymentId}`);
   }
 }
 
-export async function adminSavePlan(plan: MembershipPlan): Promise<void> {
-  const path = `plans/${plan.id}`;
+export async function adminApproveWithdrawal(
+  withdrawalId: string,
+  adminUid: string,
+  payoutReference: string,
+  adminNote = 'Paid via UPI'
+): Promise<void> {
+  await verifyAdminActionWithServer('approve_withdrawal', withdrawalId);
   try {
-    await setDoc(doc(db, 'plans', plan.id), {
-      id: sanitizeId(plan.id),
-      name: plan.name.trim().slice(0, 80),
-      tagline: (plan.tagline || '').trim().slice(0, 160),
-      price: Number(plan.price),
-      bonus: Number(plan.bonus),
-      referralReward: Number(plan.referralReward),
-      courseIds: plan.courseIds.slice(0, 20),
-      conditions: plan.conditions.filter((c) => c.trim().length > 0).slice(0, 20),
-      isActive: Boolean(plan.isActive),
-      sortOrder: Number(plan.sortOrder || 1),
+    await runTransaction(db, async (tx) => {
+      const wdRef = doc(db, 'withdrawals', withdrawalId);
+      const wdSnap = await tx.get(wdRef);
+      if (!wdSnap.exists()) throw new Error('Withdrawal request not found.');
+      const wd = wdSnap.data() as WithdrawalRequest;
+      if (wd.status !== 'pending') {
+        throw new Error(`Withdrawal already ${wd.status}.`);
+      }
+
+      const userRef = doc(db, 'users', wd.userId);
+      const userSnap = await tx.get(userRef);
+      if (!userSnap.exists()) throw new Error('User account not found.');
+      const user = userSnap.data() as UserProfile;
+
+      if (Number(user.walletBalance || 0) < Number(wd.amount)) {
+        throw new Error(
+          `Insufficient user wallet balance (₹${user.walletBalance}) for ₹${wd.amount} withdrawal.`
+        );
+      }
+
+      tx.update(userRef, {
+        walletBalance: Number(user.walletBalance) - Number(wd.amount),
+        updatedAt: serverTimestamp(),
+      });
+
+      tx.update(wdRef, {
+        status: 'approved',
+        payoutReference: (payoutReference || `UPI-${Date.now()}`).trim().slice(0, 100),
+        adminNote: adminNote.trim().slice(0, 500),
+        reviewedBy: adminUid,
+        reviewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      const txId = sanitizeId(`tx_wd_${withdrawalId}`);
+      tx.set(doc(db, 'transactions', txId), {
+        id: txId,
+        userId: wd.userId,
+        type: 'withdrawal_debit',
+        walletTarget: 'walletBalance',
+        direction: 'debit',
+        amount: Number(wd.amount),
+        description: `UPI withdrawal to ${wd.upiId} (Ref: ${payoutReference || 'Settled'})`,
+        referenceId: withdrawalId,
+        createdBy: adminUid,
+        createdAt: serverTimestamp(),
+      });
+
+      const notifId = sanitizeId(`notif_wd_${withdrawalId}`);
+      tx.set(doc(db, 'notifications', notifId), {
+        id: notifId,
+        targetUserId: wd.userId,
+        title: `Withdrawal Settled: ₹${wd.amount}`,
+        message: `₹${wd.amount} has been sent to ${wd.upiId}. Payout reference: ${payoutReference || 'Settled'}.`,
+        type: 'withdrawal',
+        createdAt: serverTimestamp(),
+      });
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `withdrawals/${withdrawalId}`);
+  }
+}
+
+export async function adminRejectWithdrawal(
+  withdrawalId: string,
+  adminUid: string,
+  reason: string
+): Promise<void> {
+  await verifyAdminActionWithServer('reject_withdrawal', withdrawalId);
+  try {
+    await runTransaction(db, async (tx) => {
+      const wdRef = doc(db, 'withdrawals', withdrawalId);
+      const wdSnap = await tx.get(wdRef);
+      if (!wdSnap.exists()) throw new Error('Withdrawal not found.');
+      const wd = wdSnap.data() as WithdrawalRequest;
+      if (wd.status !== 'pending') throw new Error(`Withdrawal already ${wd.status}.`);
+
+      tx.update(wdRef, {
+        status: 'rejected',
+        adminNote: (reason || 'Rejected by admin').trim().slice(0, 500),
+        reviewedBy: adminUid,
+        reviewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      const notifId = sanitizeId(`notif_wdr_${withdrawalId}`);
+      tx.set(doc(db, 'notifications', notifId), {
+        id: notifId,
+        targetUserId: wd.userId,
+        title: 'Withdrawal Request Declined',
+        message: `Your withdrawal of ₹${wd.amount} was declined: ${reason || 'Please check your UPI ID.'}`,
+        type: 'withdrawal',
+        createdAt: serverTimestamp(),
+      });
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `withdrawals/${withdrawalId}`);
+  }
+}
+
+export async function adminToggleUserBlock(targetUid: string, block: boolean): Promise<void> {
+  await verifyAdminActionWithServer('toggle_block', targetUid);
+  try {
+    await updateDoc(doc(db, 'users', targetUid), {
+      isBlocked: block,
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-  }
-}
-
-export async function adminSaveCourse(course: Course, isNew: boolean): Promise<void> {
-  const cleanId = sanitizeId(course.id || generateRecordId('course'));
-  const path = `courses/${cleanId}`;
-  try {
-    const payload: Record<string, any> = {
-      id: cleanId,
-      title: course.title.trim().slice(0, 120),
-      description: course.description.trim().slice(0, 1000),
-      imageUrl: course.imageUrl.trim(),
-      category: course.category.trim().slice(0, 60),
-      instructor: course.instructor.trim().slice(0, 80),
-      planIdRequired: (course.planIdRequired || '').trim().slice(0, 64),
-      lessons: (course.lessons || []).slice(0, 30),
-      isActive: Boolean(course.isActive),
-      createdAt: isNew || !course.createdAt ? serverTimestamp() : course.createdAt,
-      updatedAt: serverTimestamp(),
-    };
-
-    const parsedPrice = Number(course.price);
-    if (Number.isFinite(parsedPrice) && parsedPrice > 0) {
-      payload.price = Math.round(parsedPrice * 100) / 100;
-    } else if (course.price !== undefined) {
-      payload.price = 0;
-    }
-
-    if (course.qrCodeUrl !== undefined) {
-      payload.qrCodeUrl = course.qrCodeUrl.trim().slice(0, 250000);
-    }
-    if (course.upiId !== undefined) {
-      payload.upiId = course.upiId.trim().slice(0, 100);
-    }
-
-    await setDoc(doc(db, 'courses', cleanId), payload);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-  }
-}
-
-export async function adminDeleteCourse(courseId: string): Promise<void> {
-  const path = `courses/${courseId}`;
-  try {
-    await deleteDoc(doc(db, 'courses', courseId));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
-  }
-}
-
-export async function adminSaveSettings(settings: PlatformSettings): Promise<void> {
-  const path = 'settings/platform';
-  try {
-    await setDoc(doc(db, 'settings', 'platform'), {
-      siteName: settings.siteName.trim().slice(0, 60),
-      supportEmail: settings.supportEmail.trim().slice(0, 160),
-      supportPhone: (settings.supportPhone || '').trim().slice(0, 30),
-      minWithdrawal: Math.max(1, Number(settings.minWithdrawal || 100)),
-      referralBonusDefault: Math.max(0, Number(settings.referralBonusDefault || 50)),
-      referralConditionSummary: settings.referralConditionSummary.trim().slice(0, 500),
-      phonepeUpiId: (settings.phonepeUpiId || '').trim().slice(0, 100),
-      phonepeQrUrl: (settings.phonepeQrUrl || '').trim().slice(0, 250000),
-      gpayUpiId: (settings.gpayUpiId || '').trim().slice(0, 100),
-      gpayQrUrl: (settings.gpayQrUrl || '').trim().slice(0, 250000),
-      paytmUpiId: (settings.paytmUpiId || '').trim().slice(0, 100),
-      paytmQrUrl: (settings.paytmQrUrl || '').trim().slice(0, 250000),
-      announcementText: (settings.announcementText || '').trim().slice(0, 300),
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-  }
-}
-
-export async function adminToggleUserBlock(uid: string, isBlocked: boolean): Promise<void> {
-  const path = `users/${uid}`;
-  try {
-    await updateDoc(doc(db, 'users', uid), {
-      isBlocked,
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+    handleFirestoreError(error, OperationType.UPDATE, `users/${targetUid}`);
   }
 }
 
 export async function adminAdjustUserBalance(params: {
   targetUid: string;
-  balanceType: 'wallet' | 'bonus';
+  adminUid: string;
+  walletTarget: 'walletBalance' | 'bonusBalance';
   direction: 'credit' | 'debit';
   amount: number;
-  reason: string;
+  note: string;
 }): Promise<void> {
-  const amount = Number(params.amount);
-  if (isNaN(amount) || amount <= 0) throw new Error('Adjustment amount must be positive.');
-  const userRef = doc(db, 'users', params.targetUid);
+  const cleanAmount = Number(params.amount);
+  if (Number.isNaN(cleanAmount) || cleanAmount <= 0) {
+    throw new Error('Adjustment amount must be greater than 0.');
+  }
+  await verifyAdminActionWithServer('adjust_balance', params.targetUid, cleanAmount);
+
   try {
     await runTransaction(db, async (tx) => {
+      const userRef = doc(db, 'users', params.targetUid);
       const userSnap = await tx.get(userRef);
       if (!userSnap.exists()) throw new Error('User not found.');
       const user = userSnap.data() as UserProfile;
-      const now = serverTimestamp();
-      const currentVal = params.balanceType === 'wallet' ? Number(user.walletBalance || 0) : Number(user.bonusBalance || 0);
-      const nextVal = params.direction === 'credit' ? currentVal + amount : Math.max(0, currentVal - amount);
 
-      tx.update(userRef, {
-        [params.balanceType === 'wallet' ? 'walletBalance' : 'bonusBalance']: nextVal,
-        totalEarnings:
-          params.direction === 'credit' ? Number(user.totalEarnings || 0) + amount : Number(user.totalEarnings || 0),
-        updatedAt: now,
-      });
+      const currentVal = Number(user[params.walletTarget] || 0);
+      const nextVal =
+        params.direction === 'credit' ? currentVal + cleanAmount : currentVal - cleanAmount;
+      if (nextVal < 0) {
+        throw new Error(`Cannot debit ₹${cleanAmount}; current balance is ₹${currentVal}.`);
+      }
 
-      const txId = generateRecordId('TX');
+      const updatePayload: Record<string, any> = {
+        [params.walletTarget]: nextVal,
+        updatedAt: serverTimestamp(),
+      };
+      if (params.direction === 'credit') {
+        updatePayload.totalEarnings = Number(user.totalEarnings || 0) + cleanAmount;
+      }
+
+      tx.update(userRef, updatePayload);
+
+      const txId = sanitizeId(`tx_adj_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`);
       tx.set(doc(db, 'transactions', txId), {
         id: txId,
-        userId: user.uid,
-        type: params.direction === 'credit' ? 'admin_credit' : 'admin_debit',
-        amount,
-        balanceType: params.balanceType,
+        userId: params.targetUid,
+        type: 'admin_adjustment',
+        walletTarget: params.walletTarget,
         direction: params.direction,
-        title: params.reason.trim().slice(0, 160) || 'Admin Balance Adjustment',
+        amount: cleanAmount,
+        description: params.note.trim().slice(0, 300) || 'Manual admin adjustment',
         referenceId: txId,
-        status: 'completed',
-        createdAt: now,
+        createdBy: params.adminUid,
+        createdAt: serverTimestamp(),
       });
     });
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `users/${params.targetUid}`);
+    handleFirestoreError(error, OperationType.UPDATE, `users/${params.targetUid}`);
   }
 }
 
-export async function adminUpdateUserCourseAccess(uid: string, courseAccess: string[]): Promise<void> {
-  const path = `users/${uid}`;
+export async function adminSavePlan(plan: Omit<MembershipPlan, 'updatedAt'>): Promise<void> {
+  await verifyAdminActionWithServer('save_plan', plan.id);
+  const cleanId = sanitizeId(plan.id);
   try {
-    await updateDoc(doc(db, 'users', uid), {
-      courseAccess: courseAccess.slice(0, 50),
+    await setDoc(doc(db, 'plans', cleanId), {
+      ...plan,
+      id: cleanId,
+      name: plan.name.trim().slice(0, 100),
+      description: plan.description.trim().slice(0, 500),
+      eligibilityConditions: plan.eligibilityConditions.slice(0, 15),
+      includedCourseIds: plan.includedCourseIds.slice(0, 20),
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+    handleFirestoreError(error, OperationType.WRITE, `plans/${cleanId}`);
   }
 }
 
+export async function adminSaveCourse(
+  course: Omit<Course, 'createdAt' | 'updatedAt'>,
+  isNew: boolean
+): Promise<void> {
+  await verifyAdminActionWithServer('save_course', course.id);
+  const cleanId = sanitizeId(course.id);
+  try {
+    const ref = doc(db, 'courses', cleanId);
+    const existing = isNew ? null : await getDoc(ref);
+    await setDoc(ref, {
+      ...course,
+      id: cleanId,
+      title: course.title.trim().slice(0, 140),
+      subtitle: (course.subtitle || '').trim().slice(0, 200),
+      description: course.description.trim().slice(0, 1500),
+      category: course.category.trim().slice(0, 60),
+      imageUrl: course.imageUrl.trim().slice(0, 1000),
+      instructor: course.instructor.trim().slice(0, 100),
+      durationLabel: (course.durationLabel || '').trim().slice(0, 50),
+      requiredPlanIds: course.requiredPlanIds.slice(0, 10),
+      lessons: course.lessons.slice(0, 30),
+      createdAt: existing?.exists() ? existing.data().createdAt : serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `courses/${cleanId}`);
+  }
+}
+
+export async function adminDeleteCourse(courseId: string): Promise<void> {
+  await verifyAdminActionWithServer('delete_course', courseId);
+  try {
+    await deleteDoc(doc(db, 'courses', courseId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `courses/${courseId}`);
+  }
+}
+
+export async function adminSaveSettings(
+  settings: Omit<PlatformSettings, 'updatedAt'>
+): Promise<void> {
+  await verifyAdminActionWithServer('save_settings', 'platform');
+  try {
+    await setDoc(doc(db, 'settings', 'platform'), {
+      ...settings,
+      siteName: settings.siteName.trim().slice(0, 80),
+      supportEmail: settings.supportEmail.trim().slice(0, 160),
+      supportPhone: (settings.supportPhone || '').trim().slice(0, 30),
+      announcementText: (settings.announcementText || '').trim().slice(0, 400),
+      merchantName: (settings.merchantName || '').trim().slice(0, 100),
+      phonepeUpiId: (settings.phonepeUpiId || '').trim().slice(0, 100),
+      phonepeQrUrl: (settings.phonepeQrUrl || '').trim().slice(0, 200000),
+      gpayUpiId: (settings.gpayUpiId || '').trim().slice(0, 100),
+      gpayQrUrl: (settings.gpayQrUrl || '').trim().slice(0, 200000),
+      paytmUpiId: (settings.paytmUpiId || '').trim().slice(0, 100),
+      paytmQrUrl: (settings.paytmQrUrl || '').trim().slice(0, 200000),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'settings/platform');
+  }
+}
 
 export async function adminSendNotification(params: {
-  userId: string;
+  targetUserId: string;
   title: string;
   message: string;
-  type: NotificationItem['type'];
+  type: PlatformNotification['type'];
 }): Promise<void> {
-  const id = generateRecordId('NTF');
+  const notifId = sanitizeId(`notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
+  await verifyAdminActionWithServer('send_notification', notifId);
   try {
-    await setDoc(doc(db, 'notifications', id), {
-      id,
-      userId: params.userId.trim() || 'all',
-      title: params.title.trim().slice(0, 120),
+    await setDoc(doc(db, 'notifications', notifId), {
+      id: notifId,
+      targetUserId: params.targetUserId.trim() || 'all',
+      title: params.title.trim().slice(0, 140),
       message: params.message.trim().slice(0, 600),
       type: params.type,
       createdAt: serverTimestamp(),
     });
   } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `notifications/${id}`);
+    handleFirestoreError(error, OperationType.CREATE, `notifications/${notifId}`);
   }
 }
 
-export async function fetchAllReferralsForUser(uid: string) {
-  const path = 'referrals';
+export async function adminGrantAdminAccess(
+  targetUser: UserProfile,
+  adminUid: string
+): Promise<void> {
+  await verifyAdminActionWithServer('grant_admin', targetUser.uid);
   try {
-    const q = query(collection(db, 'referrals'), where('referrerUid', '==', uid));
-    const snap = await getDocs(q);
-    return snap.docs.map((d) => d.data());
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-  }
-}
-
-export async function adminReviewReferral(params: {
-  referralId: string;
-  decision: 'rewarded' | 'rejected';
-  rewardAmount: number;
-}): Promise<void> {
-  const refDoc = doc(db, 'referrals', params.referralId);
-  try {
-    await runTransaction(db, async (tx) => {
-      const refSnap = await tx.get(refDoc);
-      if (!refSnap.exists()) throw new Error('Referral record not found.');
-      const referral = refSnap.data();
-
-      if (referral.status === 'rewarded' || referral.status === 'rejected') {
-        throw new Error(`Referral is already ${referral.status}.`);
-      }
-
-      const now = serverTimestamp();
-
-      if (params.decision === 'rejected') {
-        tx.update(refDoc, {
-          status: 'rejected',
-          rewardAmount: 0,
-          qualifyingPlanId: referral.qualifyingPlanId || '',
-          updatedAt: now,
-        });
-        return;
-      }
-
-      const amount = Math.max(1, Number(params.rewardAmount || 0));
-      const referrerRef = doc(db, 'users', referral.referrerUid);
-      const referrerSnap = await tx.get(referrerRef);
-      if (!referrerSnap.exists()) throw new Error('Referrer user not found.');
-      const referrer = referrerSnap.data() as UserProfile;
-
-      tx.update(refDoc, {
-        status: 'rewarded',
-        rewardAmount: amount,
-        qualifyingPlanId: referral.qualifyingPlanId || 'manual_admin',
-        updatedAt: now,
-      });
-
-      tx.update(referrerRef, {
-        walletBalance: Number(referrer.walletBalance || 0) + amount,
-        totalEarnings: Number(referrer.totalEarnings || 0) + amount,
-        totalReferrals: Number(referrer.totalReferrals || 0) + 1,
-        updatedAt: now,
-      });
-
-      const txId = generateRecordId('TX');
-      tx.set(doc(db, 'transactions', txId), {
-        id: txId,
-        userId: referrer.uid,
-        type: 'referral_reward',
-        amount,
-        balanceType: 'wallet',
-        direction: 'credit',
-        title: `Verified Referral Reward · ${referral.referredName}`.slice(0, 160),
-        referenceId: referral.id,
-        status: 'completed',
-        createdAt: now,
-      });
-
-      const notifId = generateRecordId('NTF');
-      tx.set(doc(db, 'notifications', notifId), {
-        id: notifId,
-        userId: referrer.uid,
-        title: 'Referral Reward Credited',
-        message: `₹${amount} has been credited to your Wallet Balance for referring ${referral.referredName}.`.slice(0, 600),
-        type: 'success',
-        createdAt: now,
-      });
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'admins', targetUser.uid), {
+      uid: targetUser.uid,
+      email: targetUser.email,
+      addedBy: adminUid,
+      createdAt: serverTimestamp(),
     });
+    batch.update(doc(db, 'users', targetUser.uid), {
+      role: 'admin',
+      updatedAt: serverTimestamp(),
+    });
+    await batch.commit();
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `referrals/${params.referralId}`);
+    handleFirestoreError(error, OperationType.WRITE, `admins/${targetUser.uid}`);
   }
 }
 
-async function uploadCoursePaymentScreenshot(
-  file: File,
-  storagePath: string
-): Promise<string> {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('Please upload a valid image file (PNG, JPG, WEBP).');
-  }
-  const { blob, dataUrl } = await compressImageToDataUrlAndBlob(file, 880, 0.74);
-
+export async function adminRevokeAdminAccess(targetUid: string): Promise<void> {
+  await verifyAdminActionWithServer('revoke_admin', targetUid);
   try {
-    const storageRef = ref(storage, storagePath);
-    await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
-    return await getDownloadURL(storageRef);
-  } catch (err) {
-    // Only used in isolated private courseOrderProofs/{orderId} (never stored on courseOrders)
-    console.warn('Firebase Storage upload unavailable, falling back to private proof document:', err);
-    if (dataUrl.length > 230000) {
-      const smaller = await compressImageToDataUrlAndBlob(file, 560, 0.6);
-      if (smaller.dataUrl.length > 230000) {
-        throw new Error('Image is too large. Please select a smaller screenshot under 2 MB.');
-      }
-      return smaller.dataUrl;
-    }
-    return dataUrl;
-  }
-}
-
-export async function fetchCourseOrderScreenshot(orderId: string): Promise<string> {
-  const cleanId = sanitizeId(orderId);
-  if (!cleanId) {
-    throw new Error('Invalid order identifier.');
-  }
-  const path = `courseOrderProofs/${cleanId}`;
-  try {
-    const proofSnap = await getDoc(doc(db, 'courseOrderProofs', cleanId));
-    if (!proofSnap.exists()) {
-      throw new Error('Payment screenshot proof not found for this order.');
-    }
-    const url = String(proofSnap.data()?.screenshotUrl || '').trim();
-    if (!url) {
-      throw new Error('Payment screenshot proof is empty.');
-    }
-    return url;
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'admins', targetUid));
+    batch.update(doc(db, 'users', targetUid), {
+      role: 'user',
+      updatedAt: serverTimestamp(),
+    });
+    await batch.commit();
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Payment screenshot proof')) {
-      throw error;
-    }
-    handleFirestoreError(error, OperationType.GET, path);
+    handleFirestoreError(error, OperationType.DELETE, `admins/${targetUid}`);
   }
 }
 
-export async function submitCourseOrderServer(params: {
-  courseId: string;
-  method: PaymentMethod;
-  transactionId: string;
-  screenshotFile: File;
-  referralCode?: string;
-}): Promise<{
-  ok: boolean;
-  orderId: string;
-  coursePrice: number;
-  referralCode: string;
-  commissionAmount: number;
-  status: string;
+export async function fetchAdminOverviewCollections(): Promise<{
+  users: UserProfile[];
+  payments: PaymentSubmission[];
+  withdrawals: WithdrawalRequest[];
+  referrals: ReferralRecord[];
+  admins: AdminRecord[];
 }> {
-  const currentUser = auth.currentUser;
-  if (!currentUser) {
-    throw new Error('Please sign in to purchase this course.');
+  try {
+    const [uSnap, pSnap, wSnap, rSnap, aSnap] = await Promise.all([
+      getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200))),
+      getDocs(query(collection(db, 'payments'), orderBy('createdAt', 'desc'), limit(200))),
+      getDocs(query(collection(db, 'withdrawals'), orderBy('createdAt', 'desc'), limit(200))),
+      getDocs(query(collection(db, 'referrals'), orderBy('createdAt', 'desc'), limit(200))),
+      getDocs(collection(db, 'admins')),
+    ]);
+
+    return {
+      users: uSnap.docs.map((d) => d.data() as UserProfile),
+      payments: pSnap.docs.map((d) => d.data() as PaymentSubmission),
+      withdrawals: wSnap.docs.map((d) => d.data() as WithdrawalRequest),
+      referrals: rSnap.docs.map((d) => d.data() as ReferralRecord),
+      admins: aSnap.docs.map((d) => d.data() as AdminRecord),
+    };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, 'admin/overview');
   }
-
-  const cleanTxId = params.transactionId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-  if (cleanTxId.length < 6 || cleanTxId.length > 64) {
-    throw new Error('Transaction ID / UTR must be 6 to 64 alphanumeric characters.');
-  }
-
-  const proofId = generateRecordId('ORDPROOF');
-  const screenshotUrl = await uploadCoursePaymentScreenshot(
-    params.screenshotFile,
-    `payment-screenshots/${currentUser.uid}/${proofId}.jpg`
-  );
-
-  const idToken = await currentUser.getIdToken();
-  const res = await fetch('/api/course-orders/create', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify({
-      courseId: params.courseId,
-      method: params.method,
-      transactionId: cleanTxId,
-      screenshotUrl,
-      referralCode: (params.referralCode || '').trim().toUpperCase(),
-    }),
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.error || 'Unable to submit course payment order.');
-  }
-  return data;
 }
-
-export async function adminReviewCourseOrderServer(params: {
-  orderId: string;
-  decision: 'approved' | 'rejected' | 'refunded' | 'cancelled';
-  adminNote?: string;
-}): Promise<{
-  ok: boolean;
-  orderId: string;
-  status: string;
-  commissionCredited?: number;
-  reversedCommission?: number;
-}> {
-  const currentUser = auth.currentUser;
-  if (!currentUser) {
-    throw new Error('Administrator session expired. Please sign in again.');
-  }
-
-  const idToken = await currentUser.getIdToken(true);
-  const res = await fetch('/api/admin/course-orders/review', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify({
-      orderId: params.orderId,
-      decision: params.decision,
-      adminNote: params.adminNote || '',
-    }),
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.error || 'Unable to process course order action.');
-  }
-  return data;
-}
-
-
