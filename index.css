@@ -1,0 +1,267 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* SkillMint Website-Wide Purple Theme Palette */
+:root {
+  --sm-bg-page: #1b0933;
+  --sm-bg-surface: #2d1058;
+  --sm-bg-surface-hover: #3b1773;
+  --sm-bg-elevated: #5b21b6;
+  --sm-bg-inset: #220b45;
+  --sm-bg-tray: #16072b;
+  --sm-border: rgba(192, 132, 252, 0.25);
+  --sm-border-strong: rgba(216, 180, 254, 0.38);
+  --sm-divider: rgba(192, 132, 252, 0.16);
+  --sm-accent: #7c3aed;
+  --sm-accent-hover: #6d28d9;
+  --sm-text-primary: #ffffff;
+  --sm-text-secondary: #e9d5ff;
+  --sm-text-muted: #c4b5fd;
+  --sm-text-faint: #a78bfa;
+  --sm-link: #d8b4fe;
+}
+
+body {
+  background-color: var(--sm-bg-page);
+  color: var(--sm-text-primary);
+}
+
+/* Surfaces & Cards */
+.bg-slate-50 {
+  background-color: var(--sm-bg-inset);
+}
+
+.bg-white {
+  background-color: var(--sm-bg-surface);
+}
+
+.bg-white\/95 {
+  background-color: rgba(45, 16, 88, 0.95);
+}
+
+.bg-white\/60,
+.hover\:bg-white\/60:hover {
+  background-color: rgba(91, 33, 182, 0.45);
+}
+
+.bg-slate-100 {
+  background-color: var(--sm-bg-tray);
+}
+
+.bg-slate-200 {
+  background-color: rgba(167, 139, 250, 0.22);
+}
+
+.bg-slate-100 .bg-white {
+  background-color: var(--sm-bg-elevated);
+}
+
+.bg-slate-900 {
+  background-color: var(--sm-accent);
+}
+
+.hover\:bg-slate-800:hover {
+  background-color: var(--sm-accent-hover);
+}
+
+.hover\:bg-slate-50:hover,
+.hover\:bg-slate-100:hover {
+  background-color: var(--sm-bg-surface-hover);
+}
+
+/* Keep UPI QR code images & SVG wrappers white for reliable camera scanning */
+img.bg-white,
+.bg-white:has(> svg:only-child) {
+  background-color: #ffffff;
+}
+
+/* Borders & Dividers */
+.border-slate-100,
+.border-slate-200 {
+  border-color: var(--sm-border);
+}
+
+.border-slate-300 {
+  border-color: var(--sm-border-strong);
+}
+
+.divide-slate-100 > :not(:last-child) {
+  border-color: var(--sm-divider);
+}
+
+.ring-slate-200 {
+  --tw-ring-color: var(--sm-border-strong);
+}
+
+/* Form Controls */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+textarea,
+select {
+  background-color: var(--sm-bg-inset);
+  color: var(--sm-text-primary);
+  border-color: var(--sm-border-strong);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--sm-text-muted);
+  opacity: 0.72;
+}
+
+/* Typography & Readable Contrast on Dark Purple */
+.text-slate-900 {
+  color: var(--sm-text-primary);
+}
+
+.text-slate-800 {
+  color: #f3e8ff;
+}
+
+.text-slate-700,
+.text-slate-600 {
+  color: var(--sm-text-secondary);
+}
+
+.text-slate-500 {
+  color: var(--sm-text-muted);
+}
+
+.text-slate-400 {
+  color: var(--sm-text-faint);
+}
+
+.hover\:text-slate-900:hover,
+.hover\:text-slate-800:hover {
+  color: var(--sm-text-primary);
+}
+
+.text-emerald-700 {
+  color: var(--sm-link);
+}
+
+.hover\:text-emerald-800:hover,
+.hover\:text-emerald-700:hover {
+  color: var(--sm-text-primary);
+}
+
+.text-amber-700,
+.text-amber-600 {
+  color: #fcd34d;
+}
+
+.text-red-700,
+.text-red-600 {
+  color: #fda4af;
+}
+
+/* Preserve dark text on the Solid Yellow Yearly Earning card */
+.bg-yellow-400 .text-slate-950,
+.bg-yellow-400 .text-slate-900 {
+  color: #020617;
+}
+
+/* Semantic Status Banners & Alert Surfaces */
+.bg-red-50,
+.bg-rose-50 {
+  background-color: rgba(153, 27, 27, 0.42);
+  color: #fee2e2;
+}
+
+.hover\:bg-red-50:hover {
+  background-color: rgba(153, 27, 27, 0.35);
+}
+
+.border-red-200,
+.border-rose-200 {
+  border-color: rgba(252, 165, 165, 0.42);
+}
+
+.text-red-800,
+.text-rose-700 {
+  color: #fecaca;
+}
+
+.bg-amber-50 {
+  background-color: rgba(146, 64, 14, 0.42);
+  color: #fef3c7;
+}
+
+.hover\:bg-amber-100:hover {
+  background-color: rgba(180, 83, 9, 0.55);
+}
+
+.border-amber-200,
+.border-amber-300,
+.border-amber-400 {
+  border-color: rgba(252, 211, 77, 0.45);
+}
+
+.text-amber-900,
+.hover\:text-amber-900:hover {
+  color: #fef3c7;
+}
+
+.bg-amber-50 .bg-white {
+  background-color: var(--sm-bg-elevated);
+  color: var(--sm-text-primary);
+}
+
+.bg-emerald-50 {
+  background-color: rgba(6, 95, 70, 0.45);
+  color: #d1fae5;
+}
+
+.hover\:bg-emerald-50:hover {
+  background-color: rgba(6, 95, 70, 0.35);
+}
+
+.border-emerald-200 {
+  border-color: rgba(110, 231, 183, 0.45);
+}
+
+.text-emerald-900 {
+  color: #d1fae5;
+}
+
+.text-emerald-800,
+.hover\:text-emerald-950:hover {
+  color: #a7f3d0;
+}
+
