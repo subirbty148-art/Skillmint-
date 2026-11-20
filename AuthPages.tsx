@@ -249,15 +249,20 @@ export const RegisterPage: React.FC = () => {
               Full Name
             </label>
             <input
-              id="reg-name"
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Ananya Sharma"
-              className="w-full min-h-[44px] px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600"
-            />
-          </div>
+              <input
+  id="reg-name"
+  type="text"
+  required
+  value={name}
+  onChange={(e) => setName(e.target.value)}
+  placeholder="e.g. Ananya Sharma"
+  className="w-full min-h-[44px] px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600"
+  style={{
+    color: '#111827',
+    WebkitTextFillColor: '#111827',
+    opacity: 1
+  }}
+/>
 
           <div className="space-y-1.5">
             <label htmlFor="reg-email" className="block text-xs font-semibold text-slate-700">
