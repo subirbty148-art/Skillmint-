@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, KeyRound, Mail, UserPlus } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { getCapturedReferralCode, lookupReferralCode } from '../lib/firestoreService';
-
+import { useAuth } from './AuthContext';
+import { getCapturedReferralCode, lookupReferralCode } from '../firestoreService';
 export const LoginPage: React.FC = () => {
   const { loginWithEmail, loginWithGoogle, firebaseUser } = useAuth();
   const navigate = useNavigate();
