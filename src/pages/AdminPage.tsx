@@ -2002,28 +2002,23 @@ export const AdminPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-900">Video Lessons</label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const currentLessons = editingCourse.lessons || [];
-                        const nextIdx = currentLessons.length + 1;
-                        const newLesson: CourseLesson = {
-                          id: `lesson_${Date.now()}`,
-                          title: `0${nextIdx}. New Video Lesson`,
-                          duration: '10:00',
-                          videoUrl:
-                            'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-                          summary: 'Lesson summary.',
-                        };
-                        setEditingCourse({ ...editingCourse, lessons: [...currentLessons, newLesson] });
-                      }}
-                      className="min-h-[36px] px-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer touch-manipulation"
-                    >
-                      + Add Lesson
-                    </button>
-                  </div>
+  <label className="text-xs font-bold text-slate-900">
+    Course Video (MP4)
+  </label>
+
+  <input
+    type="text"
+    placeholder="MP4 Video URL"
+    value={editingCourse.videoUrl || ''}
+    onChange={(e) =>
+      setEditingCourse({
+        ...editingCourse,
+        videoUrl: e.target.value,
+      })
+    }
+    className="w-full min-h-[40px] px-3 py-2 text-xs font-mono bg-white border border-slate-300 rounded-lg"
+  />
+</div>
 
                   {(editingCourse.lessons || []).map((lesson, idx) => (
                     <div key={lesson.id || idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
