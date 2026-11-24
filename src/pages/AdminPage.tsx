@@ -2020,58 +2020,43 @@ export const AdminPage: React.FC = () => {
   />
 </div>
 
-                  {(editingCourse.lessons || []).map((lesson, idx) => (
-                    <div key={lesson.id || idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <input
-                          type="text"
-                          placeholder="Lesson Title"
-                          value={lesson.title || ''}
-                          onChange={(e) => {
-                            const updated = [...(editingCourse.lessons || [])];
-                            updated[idx] = { ...lesson, title: e.target.value };
-                            setEditingCourse({ ...editingCourse, lessons: updated });
-                          }}
-                          className="sm:col-span-2 min-h-[40px] px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Duration (10:30)"
-                          value={lesson.duration || ''}
-                          onChange={(e) => {
-                            const updated = [...(editingCourse.lessons || [])];
-                            updated[idx] = { ...lesson, duration: e.target.value };
-                            setEditingCourse({ ...editingCourse, lessons: updated });
-                          }}
-                          className="min-h-[40px] px-3 py-1.5 text-xs font-mono bg-white border border-slate-300 rounded-lg"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          placeholder="MP4 Video URL"
-                          value={lesson.videoUrl || ''}
-                          onChange={(e) => {
-                            const updated = [...(editingCourse.lessons || [])];
-                            updated[idx] = { ...lesson, videoUrl: e.target.value };
-                            setEditingCourse({ ...editingCourse, lessons: updated });
-                          }}
-                          className="flex-1 min-h-[40px] px-3 py-1.5 text-xs font-mono bg-white border border-slate-300 rounded-lg"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updated = (editingCourse.lessons || []).filter((_, i) => i !== idx);
-                            setEditingCourse({ ...editingCourse, lessons: updated });
-                          }}
-                          className="min-h-[40px] px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg cursor-pointer touch-manipulation"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                  <div className="space-y-3">
+  <label className="text-xs font-bold text-slate-900">
+    Course Video (MP4 - Max 10 Minutes)
+  </label>
+
+  <input
+    type="file"
+    accept="video/mp4,.mp4"
+    onChange={async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      try {
+        const videoUrl = await uploadVideoAsset(
+          file,
+          `courses/${editingCourse.id}/${file.name}`
+        );
+
+        setEditingCourse({
+          ...editingCourse,
+          videoUrl,
+        });
+
+        showSuccess('Video uploaded successfully.');
+      } catch (err) {
+        showError(err);
+      }
+    }}
+    className="w-full min-h-[40px] text-xs"
+  />
+
+  {editingCourse.videoUrl && (
+    <p className="text-xs text-emerald-700">
+      Video uploaded successfully.
+    </p>
+  )}
+</div>
 
                 <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
                   <button
