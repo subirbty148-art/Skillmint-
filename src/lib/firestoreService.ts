@@ -1053,7 +1053,7 @@ async function uploadCoursePaymentScreenshot(
   }
 }
 
-export async function fetchCourseOrderScreenshot(orderId: string): Promise<string> {
+
   const cleanId = sanitizeId(orderId);
   if (!cleanId) {
     throw new Error('Invalid order identifier.');
