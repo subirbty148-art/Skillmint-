@@ -1107,7 +1107,7 @@ export async function submitCourseOrderServer(params: {
     `payment-screenshots/${currentUser.uid}/${proofId}.jpg`
   );
 
-  const res = await fetch('/api/course-orders/create', {
+  
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1129,7 +1129,10 @@ console.log('COURSE ORDER REQUEST STARTED');
   }
   return data;
 }
+const idToken = await currentUser.getIdToken();
+console.log('COURSE ORDER REQUEST STARTED');
 
+const res = await fetch('/api/course-orders/create', {
 export async function adminReviewCourseOrderServer(params: {
   orderId: string;
   decision: 'approved' | 'rejected' | 'refunded' | 'cancelled';
