@@ -42,7 +42,7 @@ import {
   adminUpdateUserCourseAccess,
   fetchCourseOrderScreenshot,
   generateRecordId,
-  uploadImageAsset,
+  uploadImageAsset,uploadVideoAsset, 
 } from '../lib/firestoreService';
 import { formatDateTime, formatINR } from '../lib/formatters';
 import {
