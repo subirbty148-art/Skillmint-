@@ -334,7 +334,7 @@ async function startServer() {
 
   // Trusted Server Course Purchase Creation (price & 50% commission computed server-side)
   app.post('/api/course-orders/create', async (req, res) => {
-    try {
+    try {console.log('COURSE ORDER API REACHED');
       const idToken = extractBearerToken(req);
       if (!idToken) {
         res.status(401).json({ error: 'Missing authentication token.' });
