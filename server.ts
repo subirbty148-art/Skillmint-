@@ -127,6 +127,7 @@ class HttpError extends Error {
 }
 
 
+
 async function getFirestoreAccessToken(): Promise<string> {
   const credential = adminApp.options.credential;
 
@@ -136,12 +137,13 @@ async function getFirestoreAccessToken(): Promise<string> {
 
   const token = await credential.getAccessToken();
 
-  if (!token.accessToken) {
+  if (!token.access_token) {
     throw new Error('Unable to obtain Firebase Admin access token.');
   }
 
-  return token.accessToken;
+  return token.access_token;
 }
+
 
 async function fsGetDoc(docPath: string, _idToken: string, transaction?: string) {
   const accessToken = await getFirestoreAccessToken();
