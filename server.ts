@@ -126,62 +126,95 @@ class HttpError extends Error {
   }
 }
 
-async function fsGetDoc(docPath: string, idToken: string, transaction?: string) {
+
+async function getFirestoreAccessToken(): Promise<string> {
+  const credential = adminApp.options.credential;
+
+  if (!credential) {
+    throw new Error('Firebase Admin credential is not configured.');
+  }
+
+  const token = await credential.getAccessToken();
+
+  if (!token.accessToken) {
+    throw new Error('Unable to obtain Firebase Admin access token.');
+  }
+
+  return token.accessToken;
+}
+
+async function fsGetDoc(docPath: string, _idToken: string, transaction?: string) {
+  const accessToken = await getFirestoreAccessToken();
   const url = new URL(`${FIRESTORE_REST_BASE}/${docPath}`);
+
   if (transaction) url.searchParams.set('transaction', transaction);
+
   const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${idToken}` },
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
+
   if (res.status === 404) return null;
+
   const json = await res.json().catch(() => ({}));
+
   if (!res.ok) {
     const msg = json?.error?.message || `Firestore read failed for ${docPath}`;
-    if (res.status === 403) {
-      throw new HttpError(403, `Firestore permission denied on "${docPath}": ${msg}`);
-    }
     throw new HttpError(res.status, msg);
   }
+
   return decodeFsDoc(json);
 }
 
-async function fsBeginTransaction(idToken: string): Promise<string> {
+async function fsBeginTransaction(_idToken: string): Promise<string> {
+  const accessToken = await getFirestoreAccessToken();
+
   const res = await fetch(`${FIRESTORE_REST_BASE}:beginTransaction`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${idToken}`,
+      Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({ options: { readWrite: {} } }),
   });
+
   const json = await res.json().catch(() => ({}));
+
   if (!res.ok || !json.transaction) {
-    throw new HttpError(res.status || 500, json?.error?.message || 'Unable to start Firestore transaction.');
+    throw new HttpError(
+      res.status || 500,
+      json?.error?.message || 'Unable to start Firestore transaction.'
+    );
   }
+
   return json.transaction;
 }
 
-async function fsCommitTransaction(transaction: string, writes: any[], idToken: string) {
+async function fsCommitTransaction(
+  transaction: string,
+  writes: any[],
+  _idToken: string
+) {
+  const accessToken = await getFirestoreAccessToken();
+
   const res = await fetch(`${FIRESTORE_REST_BASE}:commit`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${idToken}`,
+      Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({ transaction, writes }),
   });
+
   const json = await res.json().catch(() => ({}));
+
   if (!res.ok) {
     const msg = json?.error?.message || 'Firestore atomic commit failed.';
-    if (res.status === 403) {
-      throw new HttpError(
-        403,
-        `Firestore Security Rules denied this atomic transaction (${msg}). Update and deploy Firestore rules to enable course affiliate orders.`
-      );
-    }
     throw new HttpError(res.status || 500, msg);
   }
+
   return json;
 }
+
 
 function makeServerId(prefix: string): string {
   const rand = crypto.randomBytes(4).toString('hex').toUpperCase();
