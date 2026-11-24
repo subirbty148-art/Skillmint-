@@ -136,6 +136,50 @@ export async function uploadImageAsset(file: File, storagePath: string): Promise
   }
 }
 
+export async function uploadVideoAsset(
+  file: File,
+  storagePath: string
+): Promise<string> {
+  if (
+    file.type !== 'video/mp4' &&
+    !file.name.toLowerCase().endsWith('.mp4')
+  ) {
+    throw new Error('Please upload an MP4 video.');
+  }
+
+  const video = document.createElement('video');
+  video.preload = 'metadata';
+
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => {
+        if (!Number.isFinite(video.duration) || video.duration <= 0) {
+          reject(new Error('Invalid video duration.'));
+        } else if (video.duration > 600) {
+          reject(new Error('Video must be 10 minutes or less.'));
+        } else {
+          resolve();
+        }
+      };
+
+      video.onerror = () => reject(new Error('Unable to read video.'));
+      video.src = objectUrl;
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  const storageRef = ref(storage, storagePath);
+
+  await uploadBytes(storageRef, file, {
+    contentType: 'video/mp4',
+  });
+
+  return await getDownloadURL(storageRef);
+}
+
 export async function lookupReferralCode(code: string): Promise<{
   code: string;
   ownerUid: string;
