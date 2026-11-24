@@ -1107,7 +1107,7 @@ export async function submitCourseOrderServer(params: {
     `payment-screenshots/${currentUser.uid}/${proofId}.jpg`
   );
 
-  const idToken = await currentUser.getIdToken();
+  const idToken = await currentUser.getIdToken();console.log('COURSE ORDER REQUEST STARTED');
   const res = await fetch('/api/course-orders/create', {
     method: 'POST',
     headers: {
