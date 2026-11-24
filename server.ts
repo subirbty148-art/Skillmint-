@@ -13,7 +13,19 @@ const configPath = fs.existsSync(path.join(process.cwd(), 'firebase-applet-confi
   ? path.join(process.cwd(), 'firebase-applet-config.json')
   : path.join(__dirname, 'firebase-applet-config.json');
 const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
+const serviceAccount = JSON.parse(
+  fs.readFileSync('/etc/secrets/serviceAccountKey.json', 'utf-8')
+);
+
+const adminApp = initializeApp({
+  credential: cert(serviceAccount),
+  projectId: PROJECT_ID,
+});
+
+const adminDb = getFirestore(adminApp);
 const PROJECT_ID: string = firebaseConfig.projectId;
 const STORAGE_BUCKET: string = firebaseConfig.storageBucket || `${PROJECT_ID}.firebasestorage.app`;
 const DATABASE_ID = '(default)';
