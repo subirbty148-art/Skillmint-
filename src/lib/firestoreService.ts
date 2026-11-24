@@ -1107,7 +1107,6 @@ export async function submitCourseOrderServer(params: {
     `payment-screenshots/${currentUser.uid}/${proofId}.jpg`
   );
 
-  const idToken = await currentUser.getIdToken();console.log('COURSE ORDER REQUEST STARTED');
   const res = await fetch('/api/course-orders/create', {
     method: 'POST',
     headers: {
@@ -1122,7 +1121,8 @@ export async function submitCourseOrderServer(params: {
       referralCode: (params.referralCode || '').trim().toUpperCase(),
     }),
   });
-
+const idToken = await currentUser.getIdToken();
+console.log('COURSE ORDER REQUEST STARTED');
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data.error || 'Unable to submit course payment order.');
