@@ -1074,3 +1074,133 @@ async function uploadCoursePaymentScreenshot(
     }
   }
 }
+
+export async function fetchCourseOrderScreenshot(orderId: string): Promise<string> {
+  const cleanId = sanitizeId(orderId);
+  if (!cleanId) {
+    throw new Error('Invalid order identifier.');
+  }
+
+  const path = `courseOrderProofs/${cleanId}`;
+
+  try {
+    const proofSnap = await getDoc(doc(db, 'courseOrderProofs', cleanId));
+
+    if (!proofSnap.exists()) {
+      throw new Error('Payment screenshot proof not found for this order.');
+    }
+
+    const url = String(proofSnap.data()?.screenshotUrl || '').trim();
+
+    if (!url) {
+      throw new Error('Payment screenshot proof is empty.');
+    }
+
+    return url;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Payment screenshot proof')) {
+      throw error;
+    }
+    handleFirestoreError(error, OperationType.GET, path);
+  }
+}
+
+export async function submitCourseOrderServer(params: {
+  courseId: string;
+  method: PaymentMethod;
+  transactionId: string;
+  screenshotFile: File;
+  referralCode?: string;
+}): Promise<{
+  ok: boolean;
+  orderId: string;
+  coursePrice: number;
+  referralCode: string;
+  commissionAmount: number;
+  status: string;
+}> {
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    throw new Error('Please sign in to purchase this course.');
+  }
+
+  const cleanTxId = params.transactionId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+
+  if (cleanTxId.length < 6 || cleanTxId.length > 64) {
+    throw new Error('Transaction ID / UTR must be 6 to 64 alphanumeric characters.');
+  }
+
+  const proofId = generateRecordId('ORDPROOF');
+
+  const screenshotUrl = await uploadCoursePaymentScreenshot(
+    params.screenshotFile,
+    `payment-screenshots/${currentUser.uid}/${proofId}.jpg`
+  );
+
+  const idToken = await currentUser.getIdToken();
+
+  const res = await fetch('/api/course-orders/create', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({
+      courseId: params.courseId,
+      method: params.method,
+      transactionId: cleanTxId,
+      screenshotUrl,
+      referralCode: (params.referralCode || '').trim().toUpperCase(),
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data.error || 'Unable to submit course payment order.');
+  }
+
+  return data;
+}
+
+export async function adminReviewCourseOrderServer(params: {
+  orderId: string;
+  decision: 'approved' | 'rejected' | 'refunded' | 'cancelled';
+  adminNote?: string;
+}): Promise<{
+  ok: boolean;
+  orderId: string;
+  status: string;
+  commissionCredited?: number;
+  reversedCommission?: number;
+}> {
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    throw new Error('Administrator session expired. Please sign in again.');
+  }
+
+  const idToken = await currentUser.getIdToken(true);
+
+  const res = await fetch('/api/admin/course-orders/review', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({
+      orderId: params.orderId,
+      decision: params.decision,
+      adminNote: params.adminNote || '',
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data.error || 'Unable to process course order action.');
+  }
+
+  return data;
+}
