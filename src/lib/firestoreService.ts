@@ -788,7 +788,7 @@ export async function adminSaveCourse(course: Course, isNew: boolean): Promise<v
       category: course.category.trim().slice(0, 60),
       instructor: course.instructor.trim().slice(0, 80),
       planIdRequired: (course.planIdRequired || '').trim().slice(0, 64),
-      lessons: (course.lessons || []).slice(0, 30),
+      lessons: (course.lessons || []).slice(0, 30),videoUrl: (course.videoUrl || '').trim(),
       isActive: Boolean(course.isActive),
       createdAt: isNew || !course.createdAt ? serverTimestamp() : course.createdAt,
       updatedAt: serverTimestamp(),
