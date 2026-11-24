@@ -1,3 +1,4 @@
+
 import crypto from 'crypto';
 import express from 'express';
 import fs from 'fs';
@@ -5,6 +6,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { createServer as createViteServer } from 'vite';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,9 +15,11 @@ const __dirname = path.dirname(__filename);
 const configPath = fs.existsSync(path.join(process.cwd(), 'firebase-applet-config.json'))
   ? path.join(process.cwd(), 'firebase-applet-config.json')
   : path.join(__dirname, 'firebase-applet-config.json');
+
 const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-import { initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+
+const PROJECT_ID: string = firebaseConfig.projectId;
+const STORAGE_BUCKET: string = firebaseConfig.storageBucket || `${PROJECT_ID}.firebasestorage.app`;
 
 const serviceAccount = JSON.parse(
   fs.readFileSync('/etc/secrets/serviceAccountKey.json', 'utf-8')
@@ -26,8 +31,7 @@ const adminApp = initializeApp({
 });
 
 const adminDb = getFirestore(adminApp);
-const PROJECT_ID: string = firebaseConfig.projectId;
-const STORAGE_BUCKET: string = firebaseConfig.storageBucket || `${PROJECT_ID}.firebasestorage.app`;
+
 const DATABASE_ID = '(default)';
 const BOOTSTRAP_ADMIN_EMAIL = 'subirbty148@gmail.com';
 const FIRESTORE_REST_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents`;
