@@ -1108,7 +1108,7 @@ export async function submitCourseOrderServer(params: {
   );
 
   const idToken = await currentUser.getIdToken();
-  const res = await fetch('/api/course-orders/create', {console.log('COURSE ORDER REQUEST STARTED');
+  const res = await fetch('/api/course-orders/create', {const res = await fetch('/api/course-orders/create', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
