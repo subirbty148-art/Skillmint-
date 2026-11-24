@@ -1026,6 +1026,7 @@ export async function adminReviewReferral(params: {
   }
 }
 
+
 async function uploadCoursePaymentScreenshot(
   file: File,
   storagePath: string
@@ -1033,138 +1034,43 @@ async function uploadCoursePaymentScreenshot(
   if (!file.type.startsWith('image/')) {
     throw new Error('Please upload a valid image file (PNG, JPG, WEBP).');
   }
+
   const { blob, dataUrl } = await compressImageToDataUrlAndBlob(file, 880, 0.74);
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   try {
     const storageRef = ref(storage, storagePath);
-    await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
-    return await getDownloadURL(storageRef);
+
+    const uploadPromise = (async () => {
+      await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
+      return await getDownloadURL(storageRef);
+    })();
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error('Screenshot upload timed out.'));
+      }, 20000);
+    });
+
+    return await Promise.race([uploadPromise, timeoutPromise]);
   } catch (err) {
-    // Only used in isolated private courseOrderProofs/{orderId} (never stored on courseOrders)
-    console.warn('Firebase Storage upload unavailable, falling back to private proof document:', err);
+    console.warn('Firebase Storage upload failed or timed out:', err);
+
     if (dataUrl.length > 230000) {
       const smaller = await compressImageToDataUrlAndBlob(file, 560, 0.6);
+
       if (smaller.dataUrl.length > 230000) {
         throw new Error('Image is too large. Please select a smaller screenshot under 2 MB.');
       }
+
       return smaller.dataUrl;
     }
+
     return dataUrl;
-  }
-}
-
-
-  const cleanId = sanitizeId(orderId);
-  if (!cleanId) {
-    throw new Error('Invalid order identifier.');
-  }
-  const path = `courseOrderProofs/${cleanId}`;
-  try {
-    const proofSnap = await getDoc(doc(db, 'courseOrderProofs', cleanId));
-    if (!proofSnap.exists()) {
-      throw new Error('Payment screenshot proof not found for this order.');
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
     }
-    const url = String(proofSnap.data()?.screenshotUrl || '').trim();
-    if (!url) {
-      throw new Error('Payment screenshot proof is empty.');
-    }
-    return url;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('Payment screenshot proof')) {
-      throw error;
-    }
-    handleFirestoreError(error, OperationType.GET, path);
   }
-}
-
-
-export async function fetchCourseOrderScreenshot(orderId: string): Promise<string> {
-  const cleanId = sanitizeId(orderId);
-  if (!cleanId) {
-    throw new Error('Invalid order identifier.');
-  }
-
-  const path = `courseOrderProofs/${cleanId}`;
-
-  try {
-    const proofSnap = await getDoc(doc(db, 'courseOrderProofs', cleanId));
-
-    if (!proofSnap.exists()) {
-      throw new Error('Payment screenshot proof not found for this order.');
-    }
-
-    const url = String(proofSnap.data()?.screenshotUrl || '').trim();
-
-    if (!url) {
-      throw new Error('Payment screenshot proof is empty.');
-    }
-
-    return url;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('Payment screenshot proof')) {
-      throw error;
-    }
-    handleFirestoreError(error, OperationType.GET, path);
-  }
-}
-
-export async function submitCourseOrderServer(params: {
-  courseId: string;
-  method: PaymentMethod;
-  transactionId: string;
-  screenshotFile: File;
-  referralCode?: string;
-}): Promise<{
-  ok: boolean;
-  orderId: string;
-  coursePrice: number;
-  referralCode: string;
-  commissionAmount: number;
-  status: string;
-}> {
-  const currentUser = auth.currentUser;
-
-  if (!currentUser) {
-    throw new Error('Please sign in to purchase this course.');
-  }
-
-  const cleanTxId = params.transactionId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-
-  if (cleanTxId.length < 6 || cleanTxId.length > 64) {
-    throw new Error('Transaction ID / UTR must be 6 to 64 alphanumeric characters.');
-  }
-
-  const proofId = generateRecordId('ORDPROOF');
-
-  const screenshotUrl = await uploadCoursePaymentScreenshot(
-    params.screenshotFile,
-    `payment-screenshots/${currentUser.uid}/${proofId}.jpg`
-  );
-
-  const idToken = await currentUser.getIdToken();
-
-  console.log('COURSE ORDER REQUEST STARTED');
-
-  const res = await fetch('/api/course-orders/create', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify({
-      courseId: params.courseId,
-      method: params.method,
-      transactionId: cleanTxId,
-      screenshotUrl,
-      referralCode: (params.referralCode || '').trim().toUpperCase(),
-    }),
-  });
-
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    throw new Error(data.error || 'Unable to submit course payment order.');
-  }
-
-  return data;
 }
