@@ -62,7 +62,7 @@ export interface Course {
   qrCodeUrl?: string;
   upiId?: string;
   planIdRequired?: string;
-  lessons: CourseLesson[];
+  lessons: CourseLesson[];videoUrl?: string;
   isActive: boolean;
   createdAt?: any;
   updatedAt?: any;
