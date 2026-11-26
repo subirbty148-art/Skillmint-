@@ -504,7 +504,28 @@ const [uploadingPlanQr, setUploadingPlanQr] = useState(false);
       setUploadingCourseQr(false);
     }
   };
+const handlePlanQrUpload = async (file?: File) => {
+  if (!file || !editingPlan) return;
+  setUploadingPlanQr(true);
+  setFeedback(null);
 
+  try {
+    const url = await uploadImageAsset(
+      file,
+      `qr-codes/plan_${editingPlan.id}_${Date.now()}.jpg`
+    );
+
+    setEditingPlan((prev) =>
+      prev ? { ...prev, qrCodeUrl: url } : null
+    );
+
+    showSuccess('Plan QR uploaded. Tap Save Plan Changes to publish.');
+  } catch (err) {
+    showError(err);
+  } finally {
+    setUploadingPlanQr(false);
+  }
+};
   const handleWithdrawalDecision = async (withdrawalId: string, decision: 'approved' | 'rejected') => {
     setBusyId(withdrawalId);
     setFeedback(null);
