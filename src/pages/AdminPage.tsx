@@ -1516,616 +1516,8 @@ const handlePlanQrUpload = async (file?: File) => {
             </div>
           )}
         </div>
-      )}
+      )}                  
 
-      {/* TAB 5: MEMBERSHIP PLANS */}
-      {tab === 'plans' && (
-        <div role="tabpanel" className="space-y-6">
-          {plans.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500">
-              No membership plans available.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plans.map((plan) => {
-                const isSelected = editingPlan?.id === plan.id;
-                return (
-                  <div
-                    key={plan.id}
-                    className={`bg-white border rounded-2xl p-5 space-y-4 transition-colors ${
-                      isSelected ? 'border-emerald-600 ring-1 ring-emerald-600' : 'border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="text-base font-bold text-slate-900 truncate">{plan.name || 'Unnamed Plan'}</h3>
-                        <div className="text-xs text-slate-500 font-mono truncate">{plan.id}</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditingPlan({
-                            ...plan,
-                            courseIds: [...(plan.courseIds || [])],
-                            conditions: [...(plan.conditions || [])],
-                          })
-                        }
-                        className="min-h-[44px] px-4 py-2 bg-slate-900 text-white text-xs font-semibold rounded-xl hover:bg-slate-800 active:bg-slate-950 shrink-0 cursor-pointer touch-manipulation select-none"
-                      >
-                        {isSelected ? 'Editing' : 'Edit Plan'}
-                      </button>
-                    </div>
-                    <div className="text-xs text-slate-700 space-y-1 font-mono">
-                      <div>Price: {formatINR(plan.price)}</div>
-                      <div>Bonus: {formatINR(plan.bonus)}</div>
-                      <div>Referral Reward: {formatINR(plan.referralReward)}</div>
-                      <div>Courses: {(plan.courseIds || []).length}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {editingPlan && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label={`Edit ${editingPlan.name || 'Plan'}`}
-              className="fixed inset-0 z-50 bg-black/50 overflow-y-auto p-3 sm:p-6 flex items-start sm:items-center justify-center"
-              onClick={() => setEditingPlan(null)}
-            >
-              <div
-                className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 my-auto shadow-xl"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">Edit {editingPlan.name || 'Plan'}</h3>
-                    <div className="text-[11px] text-slate-500 font-mono">{editingPlan.id}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditingPlan(null)}
-                    aria-label="Close plan editor"
-                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 cursor-pointer touch-manipulation"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Plan Name</label>
-
-      {/* TAB 5: MEMBERSHIP PLANS */}
-      {tab === 'plans' && (
-        <div role="tabpanel" className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Membership Plans</h2>
-              <p className="text-xs text-slate-500">Create plans and manage individual payment QR codes.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                setEditingPlan({
-                  id: generateRecordId('plan'),
-                  name: '',
-                  tagline: '',
-                  price: 0,
-                  bonus: 0,
-                  referralReward: 0,
-                  courseIds: [],
-                  conditions: [],
-                  isActive: true,
-                  sortOrder: plans.length + 1,
-                  qrCodeUrl: '',
-                })
-              }
-              className="min-h-[44px] px-4 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-xl hover:bg-emerald-700"
-            >
-              <Plus className="w-4 h-4 inline mr-2" />
-              Add New Plan
-            </button>
-          </div>
-
-          {plans.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500">
-              No membership plans available. Tap Add New Plan to create one.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plans.map((plan) => {
-                const isSelected = editingPlan?.id === plan.id;
-                return (
-                  <div
-                    key={plan.id}
-                    className={`bg-white border rounded-2xl p-5 space-y-4 transition-colors ${
-                      isSelected ? 'border-emerald-600 ring-1 ring-emerald-600' : 'border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="text-base font-bold text-slate-900 truncate">
-                          {plan.name || 'Unnamed Plan'}
-                        </h3>
-                        <div className="text-xs text-slate-500 font-mono truncate">{plan.id}</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditingPlan({
-                            ...plan,
-                            courseIds: [...(plan.courseIds || [])],
-                            conditions: [...(plan.conditions || [])],
-                          })
-                        }
-                        className="min-h-[44px] px-4 py-2 bg-slate-900 text-white text-xs font-semibold rounded-xl shrink-0"
-                      >
-                        {isSelected ? 'Editing' : 'Edit Plan'}
-                      </button>
-                    </div>
-
-                    <div className="text-xs text-slate-700 space-y-1 font-mono">
-                      <div>Price: {formatINR(plan.price)}</div>
-                      <div>Bonus: {formatINR(plan.bonus)}</div>
-                      <div>Referral Reward: {formatINR(plan.referralReward)}</div>
-                      <div>Courses: {(plan.courseIds || []).length}</div>
-                      <div>QR Code: {plan.qrCodeUrl ? 'Uploaded' : 'Not uploaded'}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {editingPlan && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label={`Edit ${editingPlan.name || 'Plan'}`}
-              className="fixed inset-0 z-50 bg-black/50 overflow-y-auto p-3 sm:p-6 flex items-start sm:items-center justify-center"
-              onClick={() => setEditingPlan(null)}
-            >
-              <div
-                className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 my-auto shadow-xl"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      {editingPlan.name ? `Edit ${editingPlan.name}` : 'New Membership Plan'}
-                    </h3>
-                    <div className="text-[11px] text-slate-500 font-mono">{editingPlan.id}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditingPlan(null)}
-                    aria-label="Close plan editor"
-                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Plan Name
-                    <input
-                      value={editingPlan.name || ''}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, name: e.target.value })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                      placeholder="Enter plan name"
-                    />
-                  </label>
-
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Tagline
-                    <input
-                      value={editingPlan.tagline || ''}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, tagline: e.target.value })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                      placeholder="Enter tagline"
-                    />
-                  </label>
-
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-
-      {/* TAB 5: MEMBERSHIP PLANS */}
-      {tab === 'plans' && (
-        <div role="tabpanel" className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Membership Plans</h2>
-              <p className="text-xs text-slate-500">Manage plans and individual payment QR codes.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                setEditingPlan({
-                  id: generateRecordId('plan'),
-                  name: '',
-                  tagline: '',
-                  price: 0,
-                  bonus: 0,
-                  referralReward: 0,
-                  courseIds: [],
-                  conditions: [],
-                  isActive: true,
-                  sortOrder: plans.length + 1,
-                  qrCodeUrl: '',
-                })
-              }
-              className="min-h-[44px] px-4 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-xl"
-            >
-              <Plus className="w-4 h-4 inline mr-2" />
-              Add New Plan
-            </button>
-          </div>
-
-          {plans.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500">
-              No membership plans available. Tap Add New Plan to create one.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plans.map((plan) => (
-                <div key={plan.id} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="text-base font-bold text-slate-900">{plan.name || 'Unnamed Plan'}</h3>
-                      <div className="text-xs text-slate-500 font-mono">{plan.id}</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditingPlan({
-                          ...plan,
-                          courseIds: [...(plan.courseIds || [])],
-                          conditions: [...(plan.conditions || [])],
-                        })
-                      }
-                      className="min-h-[44px] px-4 py-2 bg-slate-900 text-white text-xs font-semibold rounded-xl"
-                    >
-                      Edit Plan
-                    </button>
-                  </div>
-                  <div className="text-xs text-slate-700 space-y-1">
-                    <div>Price: {formatINR(plan.price)}</div>
-                    <div>Bonus: {formatINR(plan.bonus)}</div>
-                    <div>Referral Reward: {formatINR(plan.referralReward)}</div>
-                    <div>Courses: {(plan.courseIds || []).length}</div>
-                    <div>QR Code: {plan.qrCodeUrl ? 'Uploaded' : 'Not uploaded'}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {editingPlan && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Membership Plan Editor"
-              className="fixed inset-0 z-50 bg-black/50 overflow-y-auto p-3 sm:p-6 flex items-start sm:items-center justify-center"
-              onClick={() => setEditingPlan(null)}
-            >
-              <div
-                className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 my-auto shadow-xl"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      {editingPlan.name ? `Edit ${editingPlan.name}` : 'New Membership Plan'}
-                    </h3>
-                    <div className="text-[11px] text-slate-500 font-mono">{editingPlan.id}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditingPlan(null)}
-                    aria-label="Close plan editor"
-                    className="min-h-[44px] min-w-[44px] rounded-xl text-slate-500 hover:bg-slate-100"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Plan Name
-                    <input
-                      value={editingPlan.name || ''}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, name: e.target.value })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                      placeholder="Enter plan name"
-                    />
-                  </label>
-
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Tagline
-                    <input
-                      value={editingPlan.tagline || ''}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, tagline: e.target.value })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                      placeholder="Enter tagline"
-                    />
-                  </label>
-
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Price (₹)
-                    <input
-                      type="number"
-                      min="0"
-                      value={editingPlan.price ?? 0}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, price: Number(e.target.value) || 0 })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                    />
-                  </label>
-
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Bonus (₹)
-                    <input
-                      type="number"
-                      min="0"
-                      value={editingPlan.bonus ?? 0}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, bonus: Number(e.target.value) || 0 })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                    />
-                  </label>
-
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Referral Reward (₹)
-                    <input
-                      type="number"
-                      min="0"
-                      value={editingPlan.referralReward ?? 0}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, referralReward: Number(e.target.value) || 0 })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                    />
-                  </label>
-
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Sort Order
-                    <input
-                      type="number"
-                      min="0"
-                      value={editingPlan.sortOrder ?? 0}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, sortOrder: Number(e.target.value) || 0 })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                    />
-                  </label>
-                </div>
-
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-slate-700">Courses Unlocked by This Plan</h4>
-                  <div className="flex flex-wrap gap-3">
-                    {courses.map((course) => {
-                      const currentIds = editingPlan.courseIds || [];
-                      const checked = currentIds.includes(course.id);
-
-      {/* TAB 5: MEMBERSHIP PLANS */}
-      {tab === 'plans' && (
-        <div role="tabpanel" className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Membership Plans</h2>
-              <p className="text-xs text-slate-500">
-                Manage plans and individual payment QR codes.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                setEditingPlan({
-                  id: generateRecordId('plan'),
-                  name: '',
-                  tagline: '',
-                  price: 0,
-                  bonus: 0,
-                  referralReward: 0,
-                  courseIds: [],
-                  conditions: [],
-                  isActive: true,
-                  sortOrder: plans.length + 1,
-                  qrCodeUrl: '',
-                })
-              }
-              className="min-h-[44px] px-4 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-xl"
-            >
-              <Plus className="w-4 h-4 inline mr-2" />
-              Add New Plan
-            </button>
-          </div>
-
-          {plans.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500">
-              No membership plans available. Tap Add New Plan to create one.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plans.map((plan) => (
-                <div key={plan.id} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="text-base font-bold text-slate-900">
-                        {plan.name || 'Unnamed Plan'}
-                      </h3>
-                      <div className="text-xs text-slate-500 font-mono">{plan.id}</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditingPlan({
-                          ...plan,
-                          courseIds: [...(plan.courseIds || [])],
-                          conditions: [...(plan.conditions || [])],
-                        })
-                      }
-                      className="min-h-[44px] px-4 py-2 bg-slate-900 text-white text-xs font-semibold rounded-xl"
-                    >
-                      Edit Plan
-                    </button>
-                  </div>
-                  <div className="text-xs text-slate-700 space-y-1">
-                    <div>Price: {formatINR(plan.price)}</div>
-                    <div>Bonus: {formatINR(plan.bonus)}</div>
-                    <div>Referral Reward: {formatINR(plan.referralReward)}</div>
-                    <div>Courses: {(plan.courseIds || []).length}</div>
-                    <div>QR Code: {plan.qrCodeUrl ? 'Uploaded' : 'Not uploaded'}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {editingPlan && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Membership Plan Editor"
-              className="fixed inset-0 z-50 bg-black/50 overflow-y-auto p-3 sm:p-6 flex items-start sm:items-center justify-center"
-              onClick={() => setEditingPlan(null)}
-            >
-              <div
-                className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 my-auto shadow-xl"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      {editingPlan.name ? `Edit ${editingPlan.name}` : 'New Membership Plan'}
-                    </h3>
-                    <div className="text-[11px] text-slate-500 font-mono">{editingPlan.id}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditingPlan(null)}
-                    aria-label="Close plan editor"
-                    className="min-h-[44px] min-w-[44px] rounded-xl text-slate-500 hover:bg-slate-100"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Plan Name
-                    <input
-                      value={editingPlan.name || ''}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, name: e.target.value })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                      placeholder="Enter plan name"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Tagline
-                    <input
-                      value={editingPlan.tagline || ''}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, tagline: e.target.value })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                      placeholder="Enter tagline"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Price (₹)
-                    <input
-                      type="number"
-                      min="0"
-                      value={editingPlan.price ?? 0}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, price: Number(e.target.value) || 0 })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Bonus (₹)
-                    <input
-                      type="number"
-                      min="0"
-                      value={editingPlan.bonus ?? 0}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, bonus: Number(e.target.value) || 0 })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Referral Reward (₹)
-                    <input
-                      type="number"
-                      min="0"
-                      value={editingPlan.referralReward ?? 0}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, referralReward: Number(e.target.value) || 0 })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-700 space-y-1">
-                    Sort Order
-                    <input
-                      type="number"
-                      min="0"
-                      value={editingPlan.sortOrder ?? 0}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, sortOrder: Number(e.target.value) || 0 })}
-                      className="w-full border border-slate-300 rounded-xl p-3 text-sm"
-                    />
-                  </label>
-                </div>
-
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-slate-700">
-                    Courses Unlocked by This Plan
-                  </h4>
-                  <div className="flex flex-wrap gap-3">
-                    {courses.map((course) => {
-                      const currentIds = editingPlan.courseIds || [];
-                      const checked = currentIds.includes(course.id);
-                      return (
-                        <label key={course.id} className="inline-flex items-center gap-2 text-xs text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => {
-                              const next = e.target.checked
-                                ? [...currentIds, course.id]
-                                : currentIds.filter((id) => id !== course.id);
-                              setEditingPlan({ ...editingPlan, courseIds: next });
-                            }}
-                          />
-                          {course.title || course.id}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Eligibility Conditions (one per line)
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={(editingPlan.conditions || []).join('\n')}
-                    onChange={(e) =>
-                      setEditingPlan({ ...editingPlan, conditions: e.target.value.split('\n') })
-                    }
-                    className="w-full p-3 text-xs border border-slate-300 rounded-xl"
-                  />
-                </div>
-
-                <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-                  <h4 className="text-sm font-bold text-slate-900">Plan Payment QR Code</h4>
-                  <p className="text-xs text-slate-500">
-                    Upload the payment QR for this particular plan.
-                  </p>
-                  {editingPlan.qrCodeUrl ? (
-                    <div className="space-y-2">
-                      <img
-                        src={editingPlan.qrCodeUrl}
-                        alt="Plan payment QR code"
-                        className="w-44 h-44 object-contain border border-slate-200 rounded-xl bg-white p-2"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setEditingPlan({ ...editingPlan, qrCodeUrl: '' })}
 
       {/* TAB 5: MEMBERSHIP PLANS */}
       {tab === 'plans' && (
@@ -2137,7 +1529,6 @@ const handlePlanQrUpload = async (file?: File) => {
                 Create plans and manage individual payment QR codes.
               </p>
             </div>
-
             <button
               type="button"
               onClick={() =>
@@ -2182,7 +1573,6 @@ const handlePlanQrUpload = async (file?: File) => {
                         {plan.id}
                       </div>
                     </div>
-
                     <button
                       type="button"
                       onClick={() =>
@@ -2190,6 +1580,7 @@ const handlePlanQrUpload = async (file?: File) => {
                           ...plan,
                           courseIds: [...(plan.courseIds || [])],
                           conditions: [...(plan.conditions || [])],
+                          qrCodeUrl: plan.qrCodeUrl || '',
                         })
                       }
                       className="min-h-[44px] px-4 py-2 bg-slate-900 text-white text-xs font-semibold rounded-xl"
@@ -2197,7 +1588,6 @@ const handlePlanQrUpload = async (file?: File) => {
                       Edit Plan
                     </button>
                   </div>
-
                   <div className="text-xs text-slate-700 space-y-1">
                     <div>Price: {formatINR(plan.price)}</div>
                     <div>Bonus: {formatINR(plan.bonus)}</div>
@@ -2233,7 +1623,6 @@ const handlePlanQrUpload = async (file?: File) => {
                       {editingPlan.id}
                     </div>
                   </div>
-
                   <button
                     type="button"
                     onClick={() => setEditingPlan(null)}
@@ -2338,12 +1727,10 @@ const handlePlanQrUpload = async (file?: File) => {
                   <h4 className="text-xs font-semibold text-slate-700">
                     Courses Unlocked by This Plan
                   </h4>
-
                   <div className="flex flex-wrap gap-3">
                     {courses.map((course) => {
                       const currentIds = editingPlan.courseIds || [];
                       const checked = currentIds.includes(course.id);
-
                       return (
                         <label
                           key={course.id}
@@ -2356,7 +1743,6 @@ const handlePlanQrUpload = async (file?: File) => {
                               const next = e.target.checked
                                 ? [...currentIds, course.id]
                                 : currentIds.filter((id) => id !== course.id);
-
                               setEditingPlan({
                                 ...editingPlan,
                                 courseIds: next,
@@ -2391,7 +1777,6 @@ const handlePlanQrUpload = async (file?: File) => {
                   <h4 className="text-sm font-bold text-slate-900">
                     Plan Payment QR Code
                   </h4>
-
                   <p className="text-xs text-slate-500">
                     Upload the payment QR for this particular plan.
                   </p>
@@ -2403,7 +1788,6 @@ const handlePlanQrUpload = async (file?: File) => {
                         alt="Plan payment QR code"
                         className="w-44 h-44 object-contain border border-slate-200 rounded-xl bg-white p-2"
                       />
-
                       <button
                         type="button"
                         onClick={() =>
@@ -2425,7 +1809,6 @@ const handlePlanQrUpload = async (file?: File) => {
 
                   <label className="inline-flex min-h-[44px] items-center justify-center px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold cursor-pointer">
                     {uploadingPlanQr ? 'Uploading QR...' : 'Upload Plan QR'}
-
                     <input
                       type="file"
                       accept="image/*"
@@ -2462,7 +1845,6 @@ const handlePlanQrUpload = async (file?: File) => {
                   >
                     Cancel
                   </button>
-
                   <button
                     type="button"
                     disabled={uploadingPlanQr || !editingPlan.name.trim()}
@@ -2485,10 +1867,6 @@ const handlePlanQrUpload = async (file?: File) => {
           )}
         </div>
       )}
-
-
-
-
 
       {/* TAB 6: COURSES CMS */}
       {tab === 'courses' && (
