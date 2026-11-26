@@ -768,6 +768,7 @@ export async function adminSavePlan(plan: MembershipPlan): Promise<void> {
       courseIds: plan.courseIds.slice(0, 20),
       conditions: plan.conditions.filter((c) => c.trim().length > 0).slice(0, 20),
       isActive: Boolean(plan.isActive),
+      qrCodeUrl: (plan.qrCodeUrl || '').trim().slice(0, 250000),
       sortOrder: Number(plan.sortOrder || 1),
       updatedAt: serverTimestamp(),
     });
