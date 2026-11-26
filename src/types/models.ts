@@ -37,6 +37,7 @@ export interface MembershipPlan {
   conditions: string[];
   isActive: boolean;
   sortOrder: number;
+  qrCodeUrl?: string;
   updatedAt?: any;
 }
 
