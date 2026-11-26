@@ -151,7 +151,7 @@ export const AdminPage: React.FC = () => {
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [isNewCourse, setIsNewCourse] = useState(false);
   const [uploadingCourseQr, setUploadingCourseQr] = useState(false);
-
+const [uploadingPlanQr, setUploadingPlanQr] = useState(false);
   // Settings form
   const [settingsForm, setSettingsForm] = useState<PlatformSettings>(settings);
   const [uploadingQr, setUploadingQr] = useState<string | null>(null);
