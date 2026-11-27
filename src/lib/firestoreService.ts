@@ -755,27 +755,7 @@ export async function adminReviewWithdrawal(params: {
   }
 }
 
-export async function adminSavePlan(plan: MembershipPlan): Promise<void> {
-  const path = `plans/${plan.id}`;
-  try {
-    await setDoc(doc(db, 'plans', plan.id), {
-      id: sanitizeId(plan.id),
-      name: plan.name.trim().slice(0, 80),
-      tagline: (plan.tagline || '').trim().slice(0, 160),
-      price: Number(plan.price),
-      bonus: Number(plan.bonus),
-      referralReward: Number(plan.referralReward),
-      courseIds: plan.courseIds.slice(0, 20),
-      conditions: plan.conditions.filter((c) => c.trim().length > 0).slice(0, 20),
-      isActive: Boolean(plan.isActive),
-      qrCodeUrl: (plan.qrCodeUrl || '').trim().slice(0, 250000),
-      sortOrder: Number(plan.sortOrder || 1),
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-  }
-}
+
 
 export async function adminSaveCourse(course: Course, isNew: boolean): Promise<void> {
   const cleanId = sanitizeId(course.id || generateRecordId('course'));
