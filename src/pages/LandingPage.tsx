@@ -43,12 +43,7 @@ export const LandingPage: React.FC = () => {
                   <span>{firebaseUser ? 'Open Dashboard' : 'Create Free Account'}</span>
                   <ArrowRight className="w-4 h-4" aria-hidden="true" />
                 </button>
-                <Link
-                  to="/plans"
-                  className="min-h-[48px] px-6 py-3 bg-white border border-slate-300 text-slate-800 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors inline-flex items-center justify-center whitespace-nowrap"
-                >
-                  Explore Membership Plans
-                </Link>
+                
               </div>
 
               <p className="text-xs text-slate-500">
