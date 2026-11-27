@@ -468,54 +468,44 @@ export const CoursesPage: React.FC = () => {
           <div className="lg:col-span-8 space-y-4">
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               
-              ) : (
-                <div className="aspect-video bg-slate-900 relative overflow-hidden flex items-center justify-center p-6 text-center">
-                  <img
-                    src={activeCourse.imageUrl}
-                    alt={activeCourse.title}
-                    referrerPolicy="no-referrer"
-                    className="absolute inset-0 w-full h-full object-cover opacity-25"
-                  />
-                  <div className="relative z-10 max-w-md space-y-3 text-white">
-                    <Lock className="w-8 h-8 mx-auto text-emerald-400" aria-hidden="true" />
-                    <h2 className="text-lg font-bold">Unlock Course · {formatINR(effectivePrice)}</h2>
-                    <p className="text-xs text-slate-200 leading-relaxed">
-                      Purchase this course via UPI QR to unlock all {activeCourse.lessons.length} video lessons after
-                      Admin verification, or activate an eligible membership plan.
-                    </p>
-                    <div className="flex flex-wrap items-center justify-center gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => openCourseCheckout(activeCourse)}
-                        className="min-h-[44px] px-5 py-2.5 bg-emerald-600 text-white text-xs font-semibold rounded-xl hover:bg-emerald-700 inline-flex items-center justify-center gap-2"
-                      >
-                        <CreditCard className="w-4 h-4" aria-hidden="true" />
-                        <span>Buy Course ({formatINR(effectivePrice)})</span>
-                      </button>
-                      <Link
-                        to="/plans"
-                        className="inline-flex min-h-[44px] px-4 py-2.5 bg-slate-900 text-white text-xs font-semibold rounded-xl hover:bg-slate-800 items-center justify-center"
-                      >
-                        Membership Plans
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              )}
-               {hasAccess && activeCourse.videoUrl ? (
+              {hasAccess && currentLesson?.videoUrl ? (
   <div className="aspect-video bg-slate-950">
     <video
-      key={activeCourse.videoUrl}
+      key={currentLesson.videoUrl}
       controls
       controlsList="nodownload"
       playsInline
       className="w-full h-full object-contain"
       poster={activeCourse.imageUrl}
     >
-      <source src={activeCourse.videoUrl} type="video/mp4" />
+      <source src={currentLesson.videoUrl} type="video/mp4" />
       Your browser does not support HTML5 video playback.
     </video>
   </div>
+) : (
+  <div className="aspect-video bg-slate-900 flex flex-col items-center justify-center text-white p-6 text-center">
+    <Lock className="w-10 h-10 mb-4 text-emerald-400" />
+    <h2 className="text-xl font-bold">Course Video Locked</h2>
+    <p className="text-sm text-slate-300 mt-2">
+      {hasAccess
+        ? 'Video is not available yet.'
+        : 'Purchase this course to unlock all lessons.'}
+    </p>
+    {!hasAccess && (
+      <button
+        type="button"
+        onClick={() => openCourseCheckout(activeCourse)}
+        className="mt-4 min-h-[44px] px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold"
+      >
+        <CreditCard className="w-4 h-4 inline mr-2" />
+        Buy Course ({formatINR(effectivePrice)})
+      </button>
+    )}
+    <Link to="/plans" className="mt-3 text-emerald-400 underline">
+      Membership Plans
+    </Link>
+  </div>
+)}
               <div className="p-6 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs text-slate-500">
