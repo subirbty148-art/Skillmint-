@@ -19,7 +19,7 @@ import {
   TermsPage,
   WithdrawalPolicyPage,
 } from './pages/LegalPages';
-import { PlansPage } from './pages/PlansPage';
+
 import { ProfilePage } from './pages/ProfilePage';
 import { ReferralsPage } from './pages/ReferralsPage';
 import { WalletPage } from './pages/WalletPage';
