@@ -117,9 +117,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <Link to="/courses" className="hover:text-white">
                   Online Courses
                 </Link>
-                <Link to="/plans" className="hover:text-white">
-                  Membership Plans
-                </Link>
+                
                 <Link to="/referrals" className="hover:text-white">
                   Referral Program
                 </Link>
