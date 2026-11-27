@@ -2219,10 +2219,9 @@ const handlePlanQrUpload = async (file?: File) => {
           `courses/${editingCourse.id}/${file.name}`
         );
 
-        setEditingCourse({
-          ...editingCourse,
-          videoUrl,
-        });
+    setEditingCourse((prev) =>
+  prev ? { ...prev, videoUrl } : prev
+);
 
         showSuccess('Video uploaded successfully.');
       } catch (err) {
