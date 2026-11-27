@@ -470,7 +470,7 @@ export const CoursesPage: React.FC = () => {
               {hasAccess && currentLesson ? (
   <div className="aspect-video bg-slate-950">
     <video
-      key={currentLesson.videoUrl || activeCourse.videoUrl}
+      key={activeCourse.videoUrl || currentLesson.videoUrl}
       controls
       controlsList="nodownload"
       playsInline
@@ -478,7 +478,7 @@ export const CoursesPage: React.FC = () => {
       poster={activeCourse.imageUrl}
     >
       <source
-        src={currentLesson.videoUrl || activeCourse.videoUrl}
+        src={activeCourse.videoUrl || currentLesson.videoUrl}
         type="video/mp4"
       />
       Your browser does not support HTML5 video playback.
