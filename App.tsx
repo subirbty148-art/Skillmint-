@@ -19,7 +19,7 @@ import {
   TermsPage,
   WithdrawalPolicyPage,
 } from './pages/LegalPages';
-import { PlansPage } from './pages/PlansPage';
+
 import { ProfilePage } from './pages/ProfilePage';
 import { ReferralsPage } from './pages/ReferralsPage';
 import { WalletPage } from './pages/WalletPage';
@@ -113,7 +113,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/plans" element={<PlansPage />} />
+              
               <Route path="/courses" element={<CoursesPage />} />
               <Route path="/courses/:courseId" element={<CoursesPage />} />
               <Route path="/referrals" element={<ReferralsPage />} />
