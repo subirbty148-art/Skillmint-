@@ -343,7 +343,8 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-
+      {/* Course Access + Referral Link Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Course Access */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between space-y-4">
