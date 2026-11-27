@@ -93,73 +93,7 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Membership Plans */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 space-y-8">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div className="space-y-1.5">
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">Membership Plans</h2>
-            <p className="text-sm text-slate-600 max-w-2xl">
-              Choose a plan that matches your learning goals. All bonuses and course entitlements activate only after
-              manual verification of your PhonePe, Google Pay, or Paytm transaction ID.
-            </p>
-          </div>
-          <Link
-            to="/plans"
-            className="text-sm font-semibold text-emerald-700 hover:text-emerald-800 whitespace-nowrap shrink-0"
-          >
-            Compare all conditions →
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans
-            .filter((p) => p.isActive)
-            .map((plan) => (
-              <div
-                key={plan.id}
-                className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between space-y-6"
-              >
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
-                    <p className="text-xs text-slate-500">{plan.tagline}</p>
-                  </div>
-
-                  <div className="flex items-baseline gap-3 pb-4 border-b border-slate-100">
-                    <span className="text-3xl font-bold text-slate-900 font-mono tabular-nums">
-                      {formatINR(plan.price)}
-                    </span>
-                    <span className="text-xs font-semibold text-emerald-700 font-mono tabular-nums">
-                      + {formatINR(plan.bonus)} Bonus
-                    </span>
-                  </div>
-
-                  <div className="text-xs text-slate-700 font-medium">
-                    Unlocks {plan.courseIds.length} course{plan.courseIds.length > 1 ? 's' : ''} · Verified Referral
-                    Reward: <span className="font-mono tabular-nums font-semibold">{formatINR(plan.referralReward)}</span>
-                  </div>
-
-                  <ul className="space-y-2.5 text-xs text-slate-600">
-                    {plan.conditions.slice(0, 3).map((cond, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" aria-hidden="true" />
-                        <span>{cond}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => navigate('/plans')}
-                  className="w-full min-h-[44px] px-4 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-colors"
-                >
-                  Select {plan.name}
-                </button>
-              </div>
-            ))}
-        </div>
-      </section>
+  
 
       {/* Independent Courses */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 space-y-8">
