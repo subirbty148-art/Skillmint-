@@ -113,7 +113,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/plans" element={<PlansPage />} />
+              
               <Route path="/courses" element={<CoursesPage />} />
               <Route path="/courses/:courseId" element={<CoursesPage />} />
               <Route path="/referrals" element={<ReferralsPage />} />
