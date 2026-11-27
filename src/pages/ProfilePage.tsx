@@ -125,7 +125,7 @@ export const ProfilePage: React.FC = () => {
           <div>
             <div className="text-slate-500">Referral Code & Active Plan</div>
             <div className="font-mono font-semibold text-slate-900 mt-0.5">{profile.referralCode}</div>
-            <div className="text-slate-600 mt-1">{profile.activePlanName || 'No active plan'}</div>
+   <div className="text-slate-600 mt-1">{profile.activePlanName || ''}</div>
           </div>
         </div>
 
