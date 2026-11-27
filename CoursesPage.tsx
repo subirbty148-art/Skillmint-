@@ -468,17 +468,17 @@ export const CoursesPage: React.FC = () => {
           <div className="lg:col-span-8 space-y-4">
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               
-              {hasAccess && currentLesson?.videoUrl ? (
+{hasAccess && activeCourse.videoUrl ? (
   <div className="aspect-video bg-slate-950">
     <video
-      key={currentLesson.videoUrl}
+      key={activeCourse.videoUrl}
       controls
       controlsList="nodownload"
       playsInline
       className="w-full h-full object-contain"
       poster={activeCourse.imageUrl}
     >
-      <source src={currentLesson.videoUrl} type="video/mp4" />
+      <source src={activeCourse.videoUrl} type="video/mp4" />
       Your browser does not support HTML5 video playback.
     </video>
   </div>
@@ -506,6 +506,7 @@ export const CoursesPage: React.FC = () => {
     </Link>
   </div>
 )}
+
               <div className="p-6 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs text-slate-500">
