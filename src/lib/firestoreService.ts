@@ -17,7 +17,7 @@ import { DEFAULT_COURSES, DEFAULT_PLANS, DEFAULT_SETTINGS } from '../data/defaul
 import { auth, db, handleFirestoreError, OperationType, storage } from './firebase';
 import {
   Course,
-  MembershipPlan,
+  
   NotificationItem,
   PaymentMethod,
   PlatformSettings,
