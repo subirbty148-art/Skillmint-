@@ -350,7 +350,7 @@ export const DashboardPage: React.FC = () => {
           <div className="space-y-1.5">
             <div className="text-xs font-semibold text-slate-500">Active Plan</div>
             <div className="text-xl font-bold text-slate-900">
-              {profile.activePlanName || 'No Active Membership'}
+              {profile.activePlanName || ''}
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
               {profile.activePlanName
