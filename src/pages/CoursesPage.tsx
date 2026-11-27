@@ -468,18 +468,22 @@ export const CoursesPage: React.FC = () => {
           <div className="lg:col-span-8 space-y-4">
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               {hasAccess && currentLesson ? (
-                <div className="aspect-video bg-slate-950">
-                  <video
-                    key={currentLesson.videoUrl}
-                    controls
-                    controlsList="nodownload"
-                    className="w-full h-full object-contain"
-                    poster={activeCourse.imageUrl}
-                  >
-                    <source src={currentLesson.videoUrl} type="video/mp4" />
-                    Your browser does not support HTML5 video playback.
-                  </video>
-                </div>
+  <div className="aspect-video bg-slate-950">
+    <video
+      key={currentLesson.videoUrl || activeCourse.videoUrl}
+      controls
+      controlsList="nodownload"
+      playsInline
+      className="w-full h-full object-contain"
+      poster={activeCourse.imageUrl}
+    >
+      <source
+        src={currentLesson.videoUrl || activeCourse.videoUrl}
+        type="video/mp4"
+      />
+      Your browser does not support HTML5 video playback.
+    </video>
+  </div>
               ) : (
                 <div className="aspect-video bg-slate-900 relative overflow-hidden flex items-center justify-center p-6 text-center">
                   <img
