@@ -223,14 +223,7 @@ export const DashboardPage: React.FC = () => {
               <span>Admin Console</span>
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => navigate('/plans')}
-            className="min-h-[44px] px-4 py-2 bg-slate-900 text-white text-xs font-semibold rounded-xl hover:bg-slate-800 transition-colors inline-flex items-center gap-2 whitespace-nowrap"
-          >
-            <CreditCard className="w-4 h-4" aria-hidden="true" />
-            <span>{profile.activePlanName ? 'Upgrade Plan' : 'Activate Plan'}</span>
-          </button>
+          
           <button
             type="button"
             onClick={() => navigate('/wallet')}
