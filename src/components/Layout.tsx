@@ -201,17 +201,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <span>Courses</span>
             </NavLink>
 
-            <NavLink
-              to="/plans"
-              className={({ isActive }) =>
-                `min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${
-                  isActive ? 'text-white' : 'text-purple-300'
-                }`
-              }
-            >
-              <CreditCard className="w-5 h-5" aria-hidden="true" />
-              <span>Plans</span>
-            </NavLink>
+
 
             <NavLink
               to="/referrals"
