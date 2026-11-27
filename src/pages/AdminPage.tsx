@@ -750,7 +750,7 @@ const handlePlanQrUpload = async (file?: File) => {
             { id: 'withdrawals', label: `Withdrawals (${pendingWithdrawals.length})`, icon: Wallet },
             { id: 'referrals', label: `Referrals (${allReferrals.length + referredCourseOrders.length})`, icon: UserCheck },
             { id: 'users', label: 'Users', icon: Users },
-            { id: 'plans', label: 'Plans', icon: Check },
+
             { id: 'courses', label: 'Courses', icon: BookOpen },
             { id: 'settings', label: 'QR & Settings', icon: Settings },
             { id: 'notifications', label: 'Notifications', icon: Bell },
