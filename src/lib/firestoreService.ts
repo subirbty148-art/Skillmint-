@@ -138,7 +138,7 @@ export async function uploadImageAsset(file: File, storagePath: string): Promise
 
 export async function uploadVideoAsset(
   file: File,
-  storagePath: string
+  _storagePath: string
 ): Promise<string> {
   if (
     file.type !== 'video/mp4' &&
@@ -157,8 +157,6 @@ export async function uploadVideoAsset(
       video.onloadedmetadata = () => {
         if (!Number.isFinite(video.duration) || video.duration <= 0) {
           reject(new Error('Invalid video duration.'));
-        } else if (video.duration > 600) {
-          reject(new Error('Video must be 10 minutes or less.'));
         } else {
           resolve();
         }
@@ -171,15 +169,28 @@ export async function uploadVideoAsset(
     URL.revokeObjectURL(objectUrl);
   }
 
-  const storageRef = ref(storage, storagePath);
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', 'skillmint_courses');
 
-  await uploadBytes(storageRef, file, {
-    contentType: 'video/mp4',
-  });
+  const response = await fetch(
+    'https://api.cloudinary.com/v1_1/neg4xy5m/video/upload',
+    {
+      method: 'POST',
+      body: formData,
+    }
+  );
 
-  return await getDownloadURL(storageRef);
+  const result = await response.json();
+
+  if (!response.ok || !result.secure_url) {
+    throw new Error(
+      result.error?.message || 'Cloudinary video upload failed.'
+    );
+  }
+
+  return result.secure_url;
 }
-
 export async function lookupReferralCode(code: string): Promise<{
   code: string;
   ownerUid: string;
